@@ -23,7 +23,7 @@ struct RemovalGuardTests {
     @Test func refusedPaths() {
         #expect(!g.allows(h.url))
         for p in ["Library", "Library/Caches", "Library/Developer/Xcode/DerivedData", "Library/Caches/a/b",
-                  ".npm/_cacache", ".vscode/extensions/x/node_modules", "Library/foo/node_modules",
+                  ".npm/_cacache", ".vscode/extensions/x/node_modules", "Library/foo/node_modules", "LIBRARY/foo/node_modules",
                   "code/site", "Library/Caches/../Documents",
                   "Library/Application Support/com.apple.wallpaper/aerials/manifest"] {
             #expect(!g.allows(u(p)), "\(p)")
@@ -43,5 +43,19 @@ struct RemovalGuardTests {
         let link = u("Library/Caches/link")
         try FileManager.default.createSymbolicLink(at: link, withDestinationURL: u("Documents"))
         #expect(!g.allows(link))
+    }
+
+    @Test func symlinkedParentRefused() throws {
+        try h.dir("Library/Application Support/x/node_modules")
+        try h.dir("code")
+        try FileManager.default.createSymbolicLink(at: u("code/link"), withDestinationURL: u("Library/Application Support"))
+        #expect(!g.allows(u("code/link/x/node_modules")))
+    }
+
+    @Test func dotAboveScanRootOutsideHomeRefused() throws {
+        let other = try TempHome()
+        let root = other.url.appending(path: ".hidden/code")
+        let g2 = RemovalGuard(locations: Locations(home: h.url), scanRoots: [root])
+        #expect(!g2.allows(root.appending(path: "x/node_modules")))
     }
 }
