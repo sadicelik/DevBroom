@@ -92,3 +92,47 @@ public func usageFolder(for item: CleanItem, scanRoots: [URL]) -> (folder: URL, 
     default: return (url, [])
     }
 }
+
+private let extensionFolderPattern = try! NSRegularExpression(pattern: #"^(.+?)-(\d+(?:\.\d+)*)(?:-.+)?$"#)
+
+func parseExtensionFolder(_ name: String) -> (id: String, version: [Int])? {
+    let range = NSRange(name.startIndex..., in: name)
+    guard let m = extensionFolderPattern.firstMatch(in: name, range: range),
+          let idR = Range(m.range(at: 1), in: name), let vR = Range(m.range(at: 2), in: name) else { return nil }
+    let parts = name[vR].split(separator: ".").map { Int($0) }
+    guard !parts.contains(nil) else { return nil }
+    return (name[idR].lowercased(), parts.compactMap { $0 })
+}
+
+private func compareVersions(_ a: [Int], _ b: [Int]) -> Int {
+    for i in 0..<max(a.count, b.count) {
+        let x = i < a.count ? a[i] : 0, y = i < b.count ? b[i] : 0
+        if x != y { return x < y ? -1 : 1 }
+    }
+    return 0
+}
+
+/// Folder names in an editor extensions folder that are older than another installed version of the same
+/// extension and not listed in `extensions.json`. Fails closed: a missing or unreadable list gives an empty set.
+public func removableExtensionFolders(in dir: URL) -> Set<String> {
+    guard let data = try? Data(contentsOf: dir.appending(path: "extensions.json")),
+          let list = (try? JSONSerialization.jsonObject(with: data)) as? [Any] else { return [] }
+    let listed = Set(list.compactMap { ($0 as? [String: Any])?["relativeLocation"] as? String })
+    let names = (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
+    var byID: [String: [(name: String, version: [Int])]] = [:]
+    for n in names where !n.hasPrefix(".") {
+        var isDir: ObjCBool = false
+        let u = dir.appending(path: n)
+        guard FileManager.default.fileExists(atPath: u.path, isDirectory: &isDir), isDir.boolValue,
+              (try? u.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink != true,
+              let p = parseExtensionFolder(n) else { continue }
+        byID[p.id, default: []].append((n, p.version))
+    }
+    var out: Set<String> = []
+    for group in byID.values {
+        for f in group where !listed.contains(f.name) && group.contains(where: { compareVersions($0.version, f.version) > 0 }) {
+            out.insert(f.name)
+        }
+    }
+    return out
+}

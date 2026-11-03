@@ -235,4 +235,22 @@ final class FileScannersTests: XCTestCase {
         XCTAssertEqual(b.count, 1)
         XCTAssertFalse(b[0].tags.contains(.recentlyUsed))
     }
+
+    func testOldExtensionsListsOldVersionsAndTagsRunningEditor() throws {
+        let h = try TempHome()
+        for f in ["a.b-1.0.0", "a.b-1.2.0"] { try h.make(".vscode/extensions/\(f)/package.json") }
+        try Data("[{\"relativeLocation\":\"a.b-1.2.0\"}]".utf8).write(to: h.url.appending(path: ".vscode/extensions/extensions.json"))
+        let r = try scanners(h, running: ["com.microsoft.VSCode"]).oldExtensions()
+        XCTAssertEqual(r.id, .oldExtensions)
+        XCTAssertEqual(r.items.map(\.name), ["a.b 1.0.0 · VS Code"])
+        XCTAssertEqual(r.items[0].detail, "a.b")
+        XCTAssertTrue(r.items[0].tags.contains(.appRunning))
+        XCTAssertFalse(defaultTicked(r.items[0], now: now, cutoffDays: 14))
+    }
+
+    func testOldExtensionsEmptyWithoutExtensionsJson() throws {
+        let h = try TempHome()
+        for f in ["a.b-1.0.0", "a.b-1.2.0"] { try h.make(".cursor/extensions/\(f)/package.json") }
+        XCTAssertTrue(try scanners(h).oldExtensions().items.isEmpty)
+    }
 }

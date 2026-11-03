@@ -88,4 +88,16 @@ struct RemovalGuardTests {
             #expect(!g.allows(u(p)), "\(p)")
         }
     }
+
+    @Test func oldEditorExtensionsOnlyWhenRemovable() throws {
+        for f in ["a.b-1.0.0", "a.b-1.2.0"] { try h.make(".vscode/extensions/\(f)/package.json") }
+        try Data("[{\"relativeLocation\":\"a.b-1.2.0\"}]".utf8).write(to: u(".vscode/extensions/extensions.json"))
+        #expect(g.allows(u(".vscode/extensions/a.b-1.0.0")))
+        #expect(!g.allows(u(".vscode/extensions")))
+        #expect(!g.allows(u(".vscode/extensions/a.b-1.2.0")))
+        #expect(!g.allows(u(".vscode/extensions/a.b-1.0.0/package.json")))
+        #expect(!g.allows(u(".vscode/extensions/extensions.json")))
+        try FileManager.default.removeItem(at: u(".vscode/extensions/extensions.json"))
+        #expect(!g.allows(u(".vscode/extensions/a.b-1.0.0")))
+    }
 }

@@ -114,13 +114,13 @@ let isBundled = Bundle.main.bundleIdentifier != nil
         case .simDevices: return .result([await tools.simDevices()])
         case .simRuntimes: return .result([await tools.simRuntimes()])
         case .docker: return await tools.docker().map { ScanOutcome.result([$0]) } ?? .hidden
-        case .oldExtensions: return .hidden
         case .projectBuilds, .aiModels: return .cancelled  // landed by the .nodeModules job
         case .derivedData: work = { [try files.derivedData()] }
         case .packageCaches: work = { [try files.packageCaches()] }
         case .appCaches: work = { [try files.appCaches()] }
         case .nodeModules: work = { try files.projects() }
         case .deviceSupport: work = { [try files.deviceSupport()] }
+        case .oldExtensions: work = { [try files.oldExtensions()] }
         case .wallpaper: work = { [try files.wallpaper()] }
         }
         // Detached keeps the file walk off the main actor; it does not inherit cancellation, so forward it.

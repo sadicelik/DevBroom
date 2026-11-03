@@ -91,4 +91,44 @@ struct ProjectRulesTests {
         var cmd = item(.docker, b); cmd.method = .dockerPrune
         #expect(usageFolder(for: cmd, scanRoots: [h.url]) == nil)
     }
+
+    private func extDir(_ listed: [String], folders: [String], json: String? = nil, at base: String = "x") throws -> URL {
+        for f in folders { try h.make("\(base)/\(f)/package.json") }
+        let entries = listed.map { "{\"identifier\":{\"id\":\"i\"},\"version\":\"1\",\"relativeLocation\":\"\($0)\"}" }
+        let body = json ?? "[" + entries.joined(separator: ",") + "]"
+        try Data(body.utf8).write(to: h.url.appending(path: "\(base)/extensions.json"))
+        return h.url.appending(path: base)
+    }
+    private let four = ["a.b-1.0.0", "a.b-1.2.0", "ms-python.python-2026.4.0-darwin-arm64", "ms-python.python-2026.10.0-darwin-arm64"]
+
+    @Test func removableExtensionFoldersOlderVersions() throws {
+        let d = try extDir(["a.b-1.2.0", "ms-python.python-2026.10.0-darwin-arm64"], folders: four)
+        #expect(removableExtensionFolders(in: d) == ["a.b-1.0.0", "ms-python.python-2026.4.0-darwin-arm64"])
+    }
+
+    @Test func listedOldVersionIsKept() throws {
+        let d = try extDir(["a.b-1.2.0", "a.b-1.0.0", "ms-python.python-2026.10.0-darwin-arm64"], folders: four)
+        #expect(removableExtensionFolders(in: d) == ["ms-python.python-2026.4.0-darwin-arm64"])
+    }
+
+    @Test func missingOrCorruptExtensionsJsonRemovesNothing() throws {
+        for f in four { try h.make("n/\(f)/package.json") }
+        #expect(removableExtensionFolders(in: h.url.appending(path: "n")).isEmpty)
+        for body in ["{", "{}", "\"x\""] {
+            let d = try extDir([], folders: four, json: body, at: "c")
+            #expect(removableExtensionFolders(in: d).isEmpty, "\(body)")
+        }
+    }
+
+    @Test func equalVersionsAndUnparseableNeverRemovable() throws {
+        let d = try extDir(["z.z-1.0.0"], folders: ["a.b-1.0", "a.b-1.0.0", "weird", "q.r-2.0.0", "Q.R-10"])
+        // a.b-1.0 and a.b-1.0.0 compare equal; Q.R lowercased groups with q.r, 10 > 2
+        #expect(removableExtensionFolders(in: d) == ["q.r-2.0.0"])
+    }
+
+    @Test func nonDirectoriesAndDotEntriesSkipped() throws {
+        let d = try extDir(["a.b-1.2.0"], folders: ["a.b-1.2.0", ".hidden-1.0.0", ".hidden-2.0.0"])
+        try Data().write(to: d.appending(path: "a.b-1.0.0"))
+        #expect(removableExtensionFolders(in: d).isEmpty)
+    }
 }

@@ -63,6 +63,20 @@ public struct FileScanners: Sendable {
         return result(.deviceSupport, items)
     }
 
+    public func oldExtensions() throws -> CategoryResult {
+        var items: [CleanItem] = []
+        for ed in locations.editorExtensions {
+            for folder in removableExtensionFolders(in: ed.url).sorted() {
+                guard let p = parseExtensionFolder(folder) else { continue }
+                let version = folder.dropFirst(p.id.count + 1).prefix { $0 != "-" }
+                var it = try makeItem(.oldExtensions, ed.url.appending(path: folder), name: "\(p.id) \(version) · \(ed.editor)", detail: p.id)
+                if runningBundleIDs.contains(ed.bundleID) { it.tags.insert(.appRunning) }
+                items.append(it)
+            }
+        }
+        return result(.oldExtensions, items)
+    }
+
     public func wallpaper() throws -> CategoryResult {
         let items = try children(locations.wallpaperVideos).map {
             try makeItem(.wallpaper, $0, name: $0.lastPathComponent, detail: "")

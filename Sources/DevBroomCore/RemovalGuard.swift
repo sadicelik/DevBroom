@@ -10,12 +10,14 @@ public struct RemovalGuard: Sendable {
         let exact: [[String]]
         let scanRoots: [[String]]
         let hub: [String]
+        let extensionFolders: [[String]]
 
         enum Match { case no, other, build }
 
         func match(_ p: [String]) -> Match {
             // Never inside an app bundle (e.g. VS Code's bundled node_modules).
             if p.contains(where: { $0.lowercased().hasSuffix(".app") }) { return .no }
+            if p.count >= 2, extensionFolders.contains(Array(p.dropLast())) { return .other }
             if exact.contains(p) { return .other }
             if categoryFolders.contains(where: { p.count == $0.count + 1 && p.starts(with: $0) }) { return .other }
             guard let last = p.last, p.count >= 2 else { return .no }
@@ -48,10 +50,12 @@ public struct RemovalGuard: Sendable {
                   categoryFolders: ([locations.caches, locations.derivedData, locations.wallpaperVideos]
                     + locations.deviceSupportFolders).map(f),
                   exact: locations.packageCaches.map { f($0.url) },
-                  scanRoots: scanRoots.map(f), hub: f(locations.huggingFaceHub))
+                  scanRoots: scanRoots.map(f), hub: f(locations.huggingFaceHub),
+                  extensionFolders: locations.editorExtensions.map { f($0.url) })
         }
         plain = make { $0.standardizedFileURL.pathComponents }
         resolved = make { $0.resolvingSymlinksInPath().pathComponents }
+        editorExtensionFolders = locations.editorExtensions.map { $0.url.standardizedFileURL.pathComponents }
     }
 
     public func allows(_ url: URL) -> Bool {
@@ -60,9 +64,17 @@ public struct RemovalGuard: Sendable {
         let a = plain.match(url.standardizedFileURL.pathComponents)
         let b = resolved.match(url.resolvingSymlinksInPath().pathComponents)
         guard a != .no, b != .no else { return false }
+        if isEditorExtensionChild(url) { return removableExtensionFolders(in: url.deletingLastPathComponent()).contains(url.lastPathComponent) }
         if a == .build || b == .build {
             return buildEcosystem(of: url.standardizedFileURL) != nil && !gitTracksFiles(in: url)
         }
         return true
+    }
+
+    private let editorExtensionFolders: [[String]]
+
+    private func isEditorExtensionChild(_ url: URL) -> Bool {
+        let p = url.standardizedFileURL.pathComponents
+        return p.count >= 2 && editorExtensionFolders.contains(Array(p.dropLast()))
     }
 }

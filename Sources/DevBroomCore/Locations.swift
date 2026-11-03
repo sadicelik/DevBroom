@@ -13,6 +13,10 @@ public struct Locations: Sendable {
     }
     public var wallpaperVideos: URL { h("Library/Application Support/com.apple.wallpaper/aerials/videos") }
     public var huggingFaceHub: URL { h(".cache/huggingface/hub") }
+    public var editorExtensions: [(editor: String, bundleID: String, url: URL)] {
+        [("VS Code", "com.microsoft.VSCode", h(".vscode/extensions")),
+         ("Cursor", "com.todesktop.230313mzl4w4u92", h(".cursor/extensions"))]
+    }
     public var packageCaches: [(tool: String, url: URL, kind: CleanKind)] {
         [("npm", h(".npm"), .rebuilds), ("Yarn", h("Library/Caches/Yarn"), .rebuilds),
          ("pnpm", h("Library/pnpm/store"), .rebuilds), ("pip", h("Library/Caches/pip"), .rebuilds),
