@@ -4,6 +4,7 @@ import SwiftUI
 /// Spec section 10: summary, confirm (second confirmation for permanent deletes), progress, result.
 struct CleanSheet: View {
     let model: AppModel
+    let items: [CleanItem]
     let recentlyUnticked: [String]
     let dismiss: () -> Void
 
@@ -12,7 +13,6 @@ struct CleanSheet: View {
     @State private var report: CleanReport?
 
     var body: some View {
-        let items = model.selectedItems
         let trash = items.filter { !$0.method.isPermanent }
         let permanent = items.filter(\.method.isPermanent)
         VStack(alignment: .leading, spacing: 10) {
@@ -45,7 +45,7 @@ struct CleanSheet: View {
                     Spacer()
                     Button("Confirm") {
                         running = true
-                        Task { report = await model.clean() }
+                        Task { report = await model.clean(items) }
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(items.isEmpty || (!permanent.isEmpty && !understood))

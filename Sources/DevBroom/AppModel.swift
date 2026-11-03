@@ -27,7 +27,7 @@ let isBundled = Bundle.main.bundleIdentifier != nil
     var isScanning = false
     var cleanProgress: (done: Int, total: Int)?
 
-    @ObservationIgnored private var isOpen = false
+    @ObservationIgnored private(set) var isOpen = false
     @ObservationIgnored private var touched: Set<String> = []
     @ObservationIgnored private var scanTask: Task<Void, Never>?
     @ObservationIgnored private var notifier = LowSpaceNotifier(limitBytes: 0)
@@ -185,8 +185,7 @@ let isBundled = Bundle.main.bundleIdentifier != nil
         return unticked
     }
 
-    func clean() async -> CleanReport {
-        let items = selectedItems
+    func clean(_ items: [CleanItem]) async -> CleanReport {
         let cleaner = Cleaner(removalGuard: RemovalGuard(locations: Locations(home: home), scanRoots: settings.scanRoots),
                               runner: ProcessRunner(), home: home)
         cleanProgress = (0, items.count)

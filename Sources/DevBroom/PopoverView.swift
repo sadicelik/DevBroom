@@ -20,13 +20,14 @@ extension CategoryID {
 
 struct PopoverView: View {
     let model: AppModel
-    @State private var cleanSheet: [String]?  // non-nil while the clean summary shows; holds re-check untick names
+    /// Snapshot taken when the summary opens (spec section 4 rule 4): exactly these items are shown and cleaned.
+    @State private var cleanSheet: (items: [CleanItem], recent: [String])?
 
     var body: some View {
         // VStack, not Group: Group would forward onAppear/onDisappear to each swapped child.
         VStack {
-            if let recent = cleanSheet {
-                CleanSheet(model: model, recentlyUnticked: recent) { cleanSheet = nil }
+            if let sheet = cleanSheet {
+                CleanSheet(model: model, items: sheet.items, recentlyUnticked: sheet.recent) { cleanSheet = nil }
             } else {
                 main
             }
@@ -34,7 +35,10 @@ struct PopoverView: View {
         .padding(12)
         .frame(width: 400)
         .onAppear { model.popoverOpened() }
-        .onDisappear { model.popoverClosed() }
+        .onDisappear {
+            cleanSheet = nil
+            model.popoverClosed()
+        }
     }
 
     private var main: some View {
@@ -50,7 +54,10 @@ struct PopoverView: View {
             Divider()
             HStack {
                 Button("Clean \(bytes(model.selectedBytes))") {
-                    Task { cleanSheet = await model.recheckBeforeClean() }
+                    Task {
+                        let recent = await model.recheckBeforeClean()
+                        if model.isOpen { cleanSheet = (model.selectedItems, recent) }  // closed meanwhile: no summary
+                    }
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(model.selectedBytes == 0)
