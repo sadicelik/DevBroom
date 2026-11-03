@@ -114,6 +114,7 @@ let isBundled = Bundle.main.bundleIdentifier != nil
         case .simDevices: return .result(await tools.simDevices())
         case .simRuntimes: return .result(await tools.simRuntimes())
         case .docker: return await tools.docker().map(ScanOutcome.result) ?? .hidden
+        case .projectBuilds, .aiModels, .oldExtensions: return .hidden
         case .derivedData: work = { try files.derivedData() }
         case .packageCaches: work = { try files.packageCaches() }
         case .appCaches: work = { try files.appCaches() }

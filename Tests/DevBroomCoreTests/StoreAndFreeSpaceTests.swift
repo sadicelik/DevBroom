@@ -20,6 +20,16 @@ struct StoreAndFreeSpaceTests {
         #expect(out.map { $0.items.map(\.id) } == input.map { $0.items.map(\.id) })
     }
 
+    @Test func decodesV010Item() throws {
+        let json = #"""
+        {"id":"a","category":"nodeModules","name":"n","detail":"d","sizeBytes":5,
+         "method":{"trash":{"_0":"file:///tmp/a"}},"tags":[]}
+        """#
+        let it = try JSONDecoder().decode(CleanItem.self, from: Data(json.utf8))
+        #expect(it.kindOverride == nil)
+        #expect(it.kind == .rebuilds)
+    }
+
     @Test func storeCorruptReturnsEmpty() throws {
         let file = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).json")
         defer { try? FileManager.default.removeItem(at: file) }

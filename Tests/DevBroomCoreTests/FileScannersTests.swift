@@ -102,6 +102,14 @@ final class FileScannersTests: XCTestCase {
         XCTAssertEqual(r.items[0].detail, "iOS DeviceSupport")
     }
 
+    func testPackageCachesNewToolsAndKinds() throws {
+        let h = try TempHome()
+        for d in [".m2/repository/x", ".cargo/registry/x", ".pub-cache/x"] { try h.make(d) }
+        let r = try scanners(h).packageCaches()
+        XCTAssertEqual(r.items.map(\.name), ["Cargo", "Maven", "Dart/Flutter"])
+        XCTAssertEqual(r.items.map(\.kind), [.rebuilds, .redownload, .redownload])
+    }
+
     func testMissingFoldersGiveEmptyResult() throws {
         let s = scanners(try TempHome())
         for r in [try s.derivedData(), try s.packageCaches(), try s.appCaches(),

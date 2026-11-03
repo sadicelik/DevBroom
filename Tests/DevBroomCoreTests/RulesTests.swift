@@ -27,3 +27,9 @@ func item(_ c: CategoryID, daysAgo: Double?, tags: Set<ItemTag> = []) -> CleanIt
     #expect(l.packageCaches.first?.url.path == "/h/.npm")
     #expect(l.wallpaperVideos.path == "/h/Library/Application Support/com.apple.wallpaper/aerials/videos")
 }
+@Test func redownloadOverrideNeverTicked() {
+    var it = item(.packageCaches, daysAgo: 100)
+    #expect(defaultTicked(it, now: now, cutoffDays: 14))
+    it.kindOverride = .redownload
+    #expect(!defaultTicked(it, now: now, cutoffDays: 14))
+}

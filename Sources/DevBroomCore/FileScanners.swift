@@ -34,7 +34,9 @@ public struct FileScanners: Sendable {
 
     public func packageCaches() throws -> CategoryResult {
         let items = try locations.packageCaches.filter { exists($0.url) }.map {
-            try makeItem(.packageCaches, $0.url, name: $0.tool, detail: abbreviate($0.url.path))
+            var it = try makeItem(.packageCaches, $0.url, name: $0.tool, detail: abbreviate($0.url.path))
+            if $0.kind == .redownload { it.kindOverride = .redownload }
+            return it
         }
         return result(.packageCaches, items)
     }

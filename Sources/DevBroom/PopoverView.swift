@@ -9,6 +9,9 @@ extension CategoryID {
         case .packageCaches: .teal
         case .appCaches: .cyan
         case .nodeModules: .green
+        case .projectBuilds: .mint
+        case .aiModels: .red
+        case .oldExtensions: .yellow
         case .deviceSupport: .indigo
         case .wallpaper: .purple
         case .simDevices: .orange
@@ -152,8 +155,9 @@ private struct CategoryRow: View {
         case .unavailable(let why): Text(why).font(.caption).foregroundStyle(.secondary)
         case .fresh: EmptyView()
         }
-        if category.id.kind == .redownload, category.sizeBytes > 0 {
-            Label("Re-download: \(bytes(category.sizeBytes))", systemImage: "exclamationmark.triangle")
+        let redownload = category.items.filter { $0.kind == .redownload }.reduce(Int64(0)) { $0 + $1.sizeBytes }
+        if redownload > 0 {
+            Label("Re-download: \(bytes(redownload))", systemImage: "exclamationmark.triangle")
                 .font(.caption).foregroundStyle(.orange)
         }
     }
@@ -181,6 +185,7 @@ private struct ItemRow: View {
         var parts = [item.detail].filter { !$0.isEmpty }
         if let d = item.lastUsed { parts.append("\(Int(Date().timeIntervalSince(d) / 86_400))d ago") }
         let tags: [(ItemTag, String)] = [(.recentlyUsed, "recently used"), (.appRunning, "app is running"), (.inUse, "in use")]
+        if item.kind == .redownload, item.category.kind == .rebuilds { parts.append("re-download") }
         parts += tags.filter { item.tags.contains($0.0) }.map(\.1)
         return parts.joined(separator: " · ")
     }

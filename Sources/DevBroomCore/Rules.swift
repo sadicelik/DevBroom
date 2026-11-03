@@ -6,7 +6,7 @@ public func isRecentlyUsed(_ lastUsed: Date?, now: Date, cutoffDays: Int) -> Boo
 }
 
 public func defaultTicked(_ item: CleanItem, now: Date, cutoffDays: Int) -> Bool {
-    item.category.kind == .rebuilds
+    item.kind == .rebuilds
         && !isRecentlyUsed(item.lastUsed, now: now, cutoffDays: cutoffDays)
         && item.tags.isDisjoint(with: [.appRunning, .inUse])
 }
