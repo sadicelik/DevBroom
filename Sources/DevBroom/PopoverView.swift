@@ -51,7 +51,7 @@ struct PopoverView: View {
                     ForEach(model.results) { CategoryRow(model: model, category: $0) }
                 }
             }
-            .frame(maxHeight: 380)
+            .frame(height: 380)
             Divider()
             HStack {
                 Button("Clean \(bytes(model.selectedBytes))") {

@@ -46,7 +46,7 @@ let isBundled = Bundle.main.bundleIdentifier != nil
             UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
         }
         refreshFreeSpace()
-        timer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { _ in
+        timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
             MainActor.assumeIsolated { self.refreshFreeSpace() }
         }
     }
@@ -67,6 +67,7 @@ let isBundled = Bundle.main.bundleIdentifier != nil
     // MARK: scan
 
     func popoverOpened() {
+        refreshFreeSpace()
         isOpen = true
         rescan()
     }
