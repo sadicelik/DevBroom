@@ -26,7 +26,8 @@ struct PopoverView: View {
     var body: some View {
         // VStack, not Group: Group would forward onAppear/onDisappear to each swapped child.
         VStack {
-            if let sheet = cleanSheet {
+            // A clean in progress or an undismissed report takes over the popover, also after reopening.
+            if let sheet = cleanSheet ?? (model.isCleaning || model.lastReport != nil ? ([], []) : nil) {
                 CleanSheet(model: model, items: sheet.items, recentlyUnticked: sheet.recent) { cleanSheet = nil }
             } else {
                 main
@@ -60,7 +61,7 @@ struct PopoverView: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(model.selectedBytes == 0)
+                .disabled(model.selectedItems.isEmpty || model.isCleaning)
                 Spacer()
                 SettingsLink { Text("Settings") }
                     .simultaneousGesture(TapGesture().onEnded { NSApp.activate(ignoringOtherApps: true) })

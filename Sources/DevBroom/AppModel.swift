@@ -26,6 +26,9 @@ let isBundled = Bundle.main.bundleIdentifier != nil
     var totalBytes: Int64?
     var isScanning = false
     var cleanProgress: (done: Int, total: Int)?
+    var isCleaning = false
+    /// Shown until the owner dismisses it, even across popover reopenings.
+    var lastReport: CleanReport?
 
     @ObservationIgnored private(set) var isOpen = false
     @ObservationIgnored private var touched: Set<String> = []
@@ -185,16 +188,24 @@ let isBundled = Bundle.main.bundleIdentifier != nil
         return unticked
     }
 
-    func clean(_ items: [CleanItem]) async -> CleanReport {
+    /// Runs in the model, not the view, so closing the popover neither loses the result nor allows a second clean.
+    func clean(_ items: [CleanItem]) {
+        guard !isCleaning else { return }
+        isCleaning = true
+        lastReport = nil
+        cleanProgress = (0, items.count)
         let cleaner = Cleaner(removalGuard: RemovalGuard(locations: Locations(home: home), scanRoots: settings.scanRoots),
                               runner: ProcessRunner(), home: home)
-        cleanProgress = (0, items.count)
-        let report = await cleaner.clean(items) { @Sendable n, m in
-            Task { @MainActor in self.cleanProgress = (n, m) }
+        Task {
+            let report = await cleaner.clean(items) { @Sendable n, m in
+                Task { @MainActor in self.cleanProgress = (n, m) }
+            }
+            selected.subtract(items.map(\.id))
+            lastReport = report
+            cleanProgress = nil
+            isCleaning = false
+            refreshFreeSpace()
+            if isOpen { rescan() }  // no background scanning (spec section 4)
         }
-        cleanProgress = nil
-        refreshFreeSpace()
-        if isOpen { rescan() }  // no background scanning (spec section 4)
-        return report
     }
 }

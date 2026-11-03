@@ -9,17 +9,15 @@ struct CleanSheet: View {
     let dismiss: () -> Void
 
     @State private var understood = false
-    @State private var running = false
-    @State private var report: CleanReport?
 
     var body: some View {
         let trash = items.filter { !$0.method.isPermanent }
         let permanent = items.filter(\.method.isPermanent)
         VStack(alignment: .leading, spacing: 10) {
-            if let report {
+            if let report = model.lastReport {
                 result(report)
-                Button("Done", action: dismiss).keyboardShortcut(.defaultAction)
-            } else if running {
+                Button("Done") { model.lastReport = nil; dismiss() }.keyboardShortcut(.defaultAction)
+            } else if model.isCleaning {
                 let p = model.cleanProgress ?? (0, items.count)
                 ProgressView("Cleaning \(p.done) of \(p.total)", value: Double(p.done), total: Double(max(p.total, 1)))
             } else {
@@ -43,12 +41,9 @@ struct CleanSheet: View {
                 HStack {
                     Button("Cancel", action: dismiss).keyboardShortcut(.cancelAction)
                     Spacer()
-                    Button("Confirm") {
-                        running = true
-                        Task { report = await model.clean(items) }
-                    }
+                    Button("Confirm") { model.clean(items) }
                     .buttonStyle(.borderedProminent)
-                    .disabled(items.isEmpty || (!permanent.isEmpty && !understood))
+                    .disabled(items.isEmpty || model.isCleaning || (!permanent.isEmpty && !understood))
                 }
             }
         }
@@ -62,8 +57,13 @@ struct CleanSheet: View {
                 Text(bytes(items.reduce(0) { $0 + $1.sizeBytes })).font(.headline).monospacedDigit()
             }
             ForEach(items) { item in
-                HStack {
-                    Text(item.name).lineLimit(1)
+                HStack(alignment: .firstTextBaseline) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(item.name).lineLimit(1)
+                        if !item.detail.isEmpty {
+                            Text(item.detail).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                        }
+                    }
                     Spacer()
                     Text(bytes(item.sizeBytes)).monospacedDigit()
                 }
