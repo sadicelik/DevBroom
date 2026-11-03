@@ -6,6 +6,7 @@ public protocol CommandRunner: Sendable {
 
 public enum ToolLocator {
     public static let xcrun = URL(fileURLWithPath: "/usr/bin/xcrun")
+    public static let xcodeSelect = URL(fileURLWithPath: "/usr/bin/xcode-select")
 
     public static func docker(home: URL,
                               fileExists: (String) -> Bool = FileManager.default.isExecutableFile(atPath:)) -> URL? {

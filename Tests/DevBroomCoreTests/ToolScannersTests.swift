@@ -10,6 +10,13 @@ private struct FakeRunner: CommandRunner {
 }
 private struct Boom: Error {}
 
+private final class Calls: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _all: [String] = []
+    var all: [String] { lock.withLock { _all } }
+    func add(_ u: URL, _ a: [String]) { lock.withLock { _all.append(([u.path] + a).joined(separator: " ")) } }
+}
+
 @Suite struct ToolScannersTests {
     let when = Date(timeIntervalSince1970: 1_793_700_000)
 
@@ -66,9 +73,29 @@ private struct Boom: Error {}
     }
 
     @Test func missingSimctlIsUnavailable() async {
-        let s = ToolScanners(runner: FakeRunner { _, _ in throw Boom() }, home: URL(fileURLWithPath: "/nonexistent"), now: when, cutoffDays: 14)
+        let s = ToolScanners(runner: FakeRunner { u, _ in if u.lastPathComponent == "xcode-select" { return (0, "/x") }; throw Boom() },
+                             home: URL(fileURLWithPath: "/nonexistent"), now: when, cutoffDays: 14)
         #expect(await s.simDevices().status == .unavailable("Xcode simulator tools not found"))
         #expect(await s.simRuntimes().status == .unavailable("Xcode simulator tools not found"))
+    }
+
+    @Test func noDeveloperToolsSkipsXcrun() async {
+        let calls = Calls()
+        let s = ToolScanners(runner: FakeRunner { u, a in calls.add(u, a); return (2, "") },
+                             home: URL(fileURLWithPath: "/nonexistent"), now: when, cutoffDays: 14)
+        #expect(await s.simDevices().status == .unavailable("Xcode not installed"))
+        #expect(await s.simRuntimes().status == .unavailable("Xcode not installed"))
+        #expect(calls.all == ["/usr/bin/xcode-select -p"])
+    }
+
+    @Test func oldXcodeRuntimesReason() async {
+        let s = ToolScanners(runner: FakeRunner { u, a in
+            if a.starts(with: ["simctl", "runtime"]) { return (64, "") }
+            if a.starts(with: ["simctl", "list"]) { return (0, #"{"devices": {}}"#) }
+            return (0, "/Applications/Xcode.app")
+        }, home: URL(fileURLWithPath: "/nonexistent"), now: when, cutoffDays: 14)
+        #expect(await s.simDevices().status == .fresh)
+        #expect(await s.simRuntimes().status == .unavailable("Simulator runtimes need Xcode 15 or later"))
     }
 
     @Test func dockerDaemonDownIsUnavailable() async throws {

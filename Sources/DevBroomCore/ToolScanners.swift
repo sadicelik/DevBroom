@@ -97,19 +97,24 @@ public struct ToolScanners: Sendable {
     let home: URL
     let now: Date
     let cutoffDays: Int
+    /// `xcode-select -p`, run once per scanner: without developer tools any `xcrun` call pops an install dialog.
+    private let developerTools: Task<Bool, Never>
 
     public init(runner: CommandRunner, home: URL, now: Date, cutoffDays: Int) {
         self.runner = runner; self.home = home; self.now = now; self.cutoffDays = cutoffDays
+        developerTools = Task { (try? await runner.run(ToolLocator.xcodeSelect, ["-p"]))?.status == 0 }
     }
 
     private static let simMissing = "Xcode simulator tools not found"
+    private static let noXcode = "Xcode not installed"
 
     private func simctl(_ args: [String]) async -> Data? {
-        guard let out = try? await runner.run(ToolLocator.xcrun, ["simctl"] + args), out.status == 0 else { return nil }
+        guard await developerTools.value, let out = try? await runner.run(ToolLocator.xcrun, ["simctl"] + args), out.status == 0 else { return nil }
         return Data(out.stdout.utf8)
     }
 
     public func simDevices() async -> CategoryResult {
+        guard await developerTools.value else { return CategoryResult(id: .simDevices, items: [], status: .unavailable(Self.noXcode)) }
         guard let json = await simctl(["list", "devices", "--json"]),
               let items = try? SimctlParser.devices(json, now: now, cutoffDays: cutoffDays)
         else { return CategoryResult(id: .simDevices, items: [], status: .unavailable(Self.simMissing)) }
@@ -117,10 +122,14 @@ public struct ToolScanners: Sendable {
     }
 
     public func simRuntimes() async -> CategoryResult {
+        guard await developerTools.value else { return CategoryResult(id: .simRuntimes, items: [], status: .unavailable(Self.noXcode)) }
+        let devices = await simctl(["list", "devices", "--json"])
         guard let json = await simctl(["runtime", "list", "--json"]) else {
-            return CategoryResult(id: .simRuntimes, items: [], status: .unavailable(Self.simMissing))
+            // `simctl runtime` arrived in Xcode 15; older simctl still lists devices.
+            let why = devices == nil ? Self.simMissing : "Simulator runtimes need Xcode 15 or later"
+            return CategoryResult(id: .simRuntimes, items: [], status: .unavailable(why))
         }
-        let booted = await simctl(["list", "devices", "--json"]).map(SimctlParser.bootedRuntimeKeys) ?? []
+        let booted = devices.map(SimctlParser.bootedRuntimeKeys) ?? []
         guard let items = try? SimctlParser.runtimes(json, now: now, cutoffDays: cutoffDays, bootedRuntimeKeys: booted)
         else { return CategoryResult(id: .simRuntimes, items: [], status: .unavailable(Self.simMissing)) }
         return CategoryResult(id: .simRuntimes, items: items, status: .fresh)
