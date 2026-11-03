@@ -9,7 +9,7 @@ struct SettingsView: View {
         Form {
             Stepper("Recently used: \(settings.cutoffDays) days", value: $settings.cutoffDays, in: 1...365)
             Stepper("Notify below: \(settings.lowSpaceLimitGB) GB free", value: $settings.lowSpaceLimitGB, in: 1...500)
-            Section("Scan roots for node_modules") {
+            Section("Project scan roots") {
                 ForEach(settings.scanRoots, id: \.self) { root in
                     HStack {
                         Text(root.path).lineLimit(1).truncationMode(.middle)
