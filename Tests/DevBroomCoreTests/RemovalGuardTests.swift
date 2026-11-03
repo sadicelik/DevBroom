@@ -75,7 +75,7 @@ struct RemovalGuardTests {
         try h.dir("p2/build"); try h.dir(".cache/huggingface/hub")
         try h.make("m/build.gradle"); try h.make("m/build/run.sh")
         try h.make("X.app/Contents/Cargo.toml"); try h.dir("X.app/Contents/target")
-        try h.make(".secret/p/Cargo.toml"); try h.dir(".secret/p/build")
+        try h.make(".secret/p/Cargo.toml"); try h.dir(".secret/p/target")
         try h.make("Library/p/build.gradle"); try h.dir("Library/p/build")
         try h.make("p/.hvigor/build.gradle"); try h.dir("p/.hvigor/build")
         try h.dir("z/hf/models--a--b")
@@ -84,7 +84,7 @@ struct RemovalGuardTests {
             #expect(!g.allows(u("m/build")), "git-tracked")
         }
         for p in ["p2/build", ".cache/huggingface", ".cache/huggingface/hub", "z/hf/models--a--b", "X.app/Contents/target",
-                  ".secret/p/build", "Library/p/build", "p/.hvigor/build"] {
+                  ".secret/p/target", "Library/p/build", "p/.hvigor/build"] {
             #expect(!g.allows(u(p)), "\(p)")
         }
     }

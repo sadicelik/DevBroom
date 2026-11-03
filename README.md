@@ -45,7 +45,7 @@ Trash removal is recoverable until you empty the Trash. Permanent removals go th
 2. **No background scanning.** It scans only when the popover is open. While closed, the only work is a cheap free-space check.
 3. **No waiting.** Opening the popover shows the last scan's results at once; sizes refresh row by row.
 4. **Nothing removed without you.** Nothing is removed until you press Clean and confirm the summary.
-5. **Build folders need a project marker.** A build folder is listed only when its project marker is next to it (for example `build.gradle`, `pubspec.yaml`, `Cargo.toml`). It is skipped when git tracks any file inside it. "Recently used" is measured over the whole project, meaning the nearest parent folder with a `.git` folder, so a recent edit in another module protects the build folder.
+5. **Build folders need a project marker.** A build folder is listed only when its project marker is present (next to it, or inside it for `.venv`; for example `build.gradle`, `pubspec.yaml`, `Cargo.toml`). It is skipped when git tracks any file inside it. "Recently used" is measured over the whole project, meaning the nearest folder, starting at the marker's folder and staying below the scan root, that contains `.git` (a folder or a file), or the marker's folder if there is none, so a recent edit in another module protects the build folder.
 6. **Model downloads are never ticked.** AI model downloads are Re-download items, so they always start unticked and show the warning.
 7. **Only old extension versions are offered.** For VS Code and Cursor, DevBroom lists a version only when a newer version of the same extension sits next to it. Anything listed in the editor's `extensions.json` is protected. If that file is missing, nothing is offered.
 

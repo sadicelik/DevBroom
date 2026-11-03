@@ -58,7 +58,8 @@ public struct RemovalGuard: Sendable {
         editorExtensionFolders = locations.editorExtensions.map { $0.url.standardizedFileURL.pathComponents }
     }
 
-    public func allows(_ url: URL) -> Bool {
+    /// `gitTracks` defaults to the real check; scans may pass a cached one. The Cleaner never does.
+    public func allows(_ url: URL, gitTracks: (URL) -> Bool = { gitTracksFiles(in: $0) }) -> Bool {
         guard url.isFileURL, !url.pathComponents.contains("..") else { return false }
         if (try? url.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == true { return false }
         let a = plain.match(url.standardizedFileURL.pathComponents)
@@ -66,7 +67,7 @@ public struct RemovalGuard: Sendable {
         guard a != .no, b != .no else { return false }
         if isEditorExtensionChild(url) { return removableExtensionFolders(in: url.deletingLastPathComponent()).contains(url.lastPathComponent) }
         if a == .build || b == .build {
-            return buildEcosystem(of: url.standardizedFileURL) != nil && !gitTracksFiles(in: url)
+            return buildEcosystem(of: url.standardizedFileURL) != nil && !gitTracks(url)
         }
         return true
     }

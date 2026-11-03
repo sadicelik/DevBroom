@@ -236,6 +236,27 @@ final class FileScannersTests: XCTestCase {
         XCTAssertFalse(b[0].tags.contains(.recentlyUsed))
     }
 
+    func testTwoBuildFoldersShareProjectRecency() throws {
+        let h = try TempHome()
+        try repo(h, "p")
+        try h.make("p/a/hvigorfile.ts", modified: ago(100))
+        try h.make("p/a/build/x", modified: ago(100))
+        try h.make("p/b/build.gradle", modified: ago(100))
+        try h.make("p/b/build/x", modified: ago(100))
+        try h.make("p/src/new.ets", modified: ago(1))
+        let b = result(try scanners(h).projects(), .projectBuilds).items
+        XCTAssertEqual(b.count, 2)
+        XCTAssertEqual(b[0].lastUsed, b[1].lastUsed)
+        XCTAssertTrue(b.allSatisfy { $0.tags.contains(.recentlyUsed) })
+    }
+
+    func testPackageCacheWalkSkipped() throws {
+        let h = try TempHome()
+        try h.make("go/pkg/mod/x/build.gradle")
+        try h.make("go/pkg/mod/x/build/f")
+        XCTAssertTrue(result(try scanners(h).projects(), .projectBuilds).items.isEmpty)
+    }
+
     func testOldExtensionsListsOldVersionsAndTagsRunningEditor() throws {
         let h = try TempHome()
         for f in ["a.b-1.0.0", "a.b-1.2.0"] { try h.make(".vscode/extensions/\(f)/package.json") }

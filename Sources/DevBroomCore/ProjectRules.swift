@@ -28,17 +28,30 @@ public func buildEcosystem(of folder: URL) -> Ecosystem? {
     }
 }
 
-private func run(_ path: String, _ args: [String]) -> (status: Int32, out: Data)? {
+private final class OutputBox: @unchecked Sendable { var data = Data() }
+
+/// Runs a tool and returns its status and stdout, or nil on launch failure or after `timeout` seconds (process terminated).
+private func run(_ path: String, _ args: [String], timeout: TimeInterval = 5) -> (status: Int32, out: Data)? {
     let p = Process()
     p.executableURL = URL(filePath: path)
     p.arguments = args
     let pipe = Pipe()
     p.standardOutput = pipe
     p.standardError = FileHandle.nullDevice
+    let exited = DispatchSemaphore(value: 0)
+    p.terminationHandler = { _ in exited.signal() }
     guard (try? p.run()) != nil else { return nil }
-    let data = pipe.fileHandleForReading.readDataToEndOfFile()
-    p.waitUntilExit()
-    return (p.terminationStatus, data)
+    let box = OutputBox(), read = DispatchSemaphore(value: 0)
+    DispatchQueue.global().async {
+        box.data = pipe.fileHandleForReading.readDataToEndOfFile()
+        read.signal()
+    }
+    if exited.wait(timeout: .now() + timeout) == .timedOut {
+        p.terminate()
+        return nil
+    }
+    guard read.wait(timeout: .now() + 2) == .success else { return nil }
+    return (p.terminationStatus, box.data)
 }
 
 private let developerToolsInstalled: Bool = run("/usr/bin/xcode-select", ["-p"])?.status == 0
@@ -117,7 +130,16 @@ private func compareVersions(_ a: [Int], _ b: [Int]) -> Int {
 public func removableExtensionFolders(in dir: URL) -> Set<String> {
     guard let data = try? Data(contentsOf: dir.appending(path: "extensions.json")),
           let list = (try? JSONSerialization.jsonObject(with: data)) as? [Any] else { return [] }
-    let listed = Set(list.compactMap { ($0 as? [String: Any])?["relativeLocation"] as? String })
+    // Protected folder name per entry: relativeLocation, else the last component of location.path / fsPath.
+    // An entry that names no folder gives an empty set (fail closed).
+    var listed: Set<String> = []
+    for entry in list {
+        guard let e = entry as? [String: Any] else { return [] }
+        let loc = e["location"] as? [String: Any]
+        let raw = (e["relativeLocation"] as? String) ?? (loc?["path"] as? String) ?? (loc?["fsPath"] as? String)
+        guard let raw, let name = raw.split(separator: "/").last else { return [] }
+        listed.insert(String(name))
+    }
     let names = (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
     var byID: [String: [(name: String, version: [Int])]] = [:]
     for n in names where !n.hasPrefix(".") {

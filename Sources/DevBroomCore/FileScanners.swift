@@ -16,9 +16,10 @@ public struct FileScanners: Sendable {
     }
 
     /// Lists only what the Cleaner's guard would allow, so scanner and guard never disagree.
-    private func result(_ id: CategoryID, _ items: [CleanItem]) -> CategoryResult {
+    private func result(_ id: CategoryID, _ items: [CleanItem],
+                        gitTracks: (URL) -> Bool = { gitTracksFiles(in: $0) }) -> CategoryResult {
         CategoryResult(id: id, items: items.filter {
-            if case .trash(let u) = $0.method { return removalGuard.allows(u) }
+            if case .trash(let u) = $0.method { return removalGuard.allows(u, gitTracks: gitTracks) }
             return true
         }, status: .fresh)
     }
@@ -89,6 +90,17 @@ public struct FileScanners: Sendable {
         let library = locations.home.appendingPathComponent("Library").standardizedFileURL.path
         var nodes: [CleanItem] = [], builds: [CleanItem] = [], models: [CleanItem] = []
         var seen: Set<String> = []
+        // Per-call memos: git answers by build folder, newest modification by usage folder.
+        var gitMemo: [String: Bool] = [:]
+        var usageMemo: [String: Date?] = [:]
+        func tracked(_ u: URL) -> Bool {
+            let key = u.standardizedFileURL.path
+            if let c = gitMemo[key] { return c }
+            let r = gitTracksFiles(in: u)
+            gitMemo[key] = r
+            return r
+        }
+        let packageCachePaths = Set(locations.packageCaches.map { $0.url.standardizedFileURL.path })
         for root in scanRoots {
             guard let en = FileManager.default.enumerator(
                 at: root, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey], options: [.skipsPackageDescendants],
@@ -100,16 +112,17 @@ public struct FileScanners: Sendable {
                 guard let v = try? u.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]),
                       v.isDirectory == true, v.isSymbolicLink != true else { continue }
                 let name = u.lastPathComponent
+                if packageCachePaths.contains(u.standardizedFileURL.path) { en.skipDescendants(); continue }
                 if projectBuildFolderNames.contains(name), let eco = buildEcosystem(of: u) {
                     // Git-tracked candidates are not listed but are walked into like any other folder (spec 4.2).
-                    if !gitTracksFiles(in: u) {
+                    if !tracked(u) {
                         en.skipDescendants()
                         guard seen.insert(u.standardizedFileURL.path).inserted else { continue }
                         let marker = u.deletingLastPathComponent()
                         let project = projectFolder(forMarkerFolder: marker, scanRoot: root)
                         var it = try makeItem(.projectBuilds, u, name: "\(project.lastPathComponent) · \(eco.rawValue) \(name)",
                                               detail: abbreviate(marker.standardizedFileURL.path))
-                        try setUsage(&it)
+                        try setUsage(&it, memo: &usageMemo)
                         builds.append(it)
                         continue
                     }
@@ -130,7 +143,7 @@ public struct FileScanners: Sendable {
                     guard exists(parent.appendingPathComponent("package.json")),
                           seen.insert(u.standardizedFileURL.path).inserted else { continue }
                     var it = try makeItem(.nodeModules, u, name: parent.lastPathComponent, detail: abbreviate(parent.standardizedFileURL.path))
-                    try setUsage(&it)
+                    try setUsage(&it, memo: &usageMemo)
                     nodes.append(it)
                 }
             }
@@ -138,7 +151,8 @@ public struct FileScanners: Sendable {
         for m in try children(locations.huggingFaceHub) where modelDisplayName(m.lastPathComponent) != nil {
             if seen.insert(m.standardizedFileURL.path).inserted { models.append(try modelItem(m)) }
         }
-        return [result(.nodeModules, nodes), result(.projectBuilds, builds), result(.aiModels, models)]
+        return [result(.nodeModules, nodes, gitTracks: tracked), result(.projectBuilds, builds, gitTracks: tracked),
+                result(.aiModels, models, gitTracks: tracked)]
     }
 
     private func modelItem(_ u: URL) throws -> CleanItem {
@@ -146,9 +160,14 @@ public struct FileScanners: Sendable {
     }
 
     /// lastUsed from the item's usage folder (see `usageFolder`), so scan and re-check share one rule.
-    private func setUsage(_ it: inout CleanItem) throws {
+    private func setUsage(_ it: inout CleanItem, memo: inout [String: Date?]) throws {
         guard let (folder, skipping) = usageFolder(for: it, scanRoots: scanRoots) else { return }
-        let lastUsed = try folderStats(folder, skipping: skipping).newestModification
+        let key = folder.standardizedFileURL.path + "|" + skipping.sorted().joined(separator: ",")
+        let lastUsed: Date?
+        if let c = memo[key] { lastUsed = c } else {
+            lastUsed = try folderStats(folder, skipping: skipping).newestModification
+            memo[key] = .some(lastUsed)
+        }
         it.lastUsed = lastUsed
         it.tags.remove(.recentlyUsed)
         if isRecentlyUsed(lastUsed, now: now, cutoffDays: cutoffDays) { it.tags.insert(.recentlyUsed) }

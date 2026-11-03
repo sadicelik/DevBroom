@@ -131,4 +131,16 @@ struct ProjectRulesTests {
         try Data().write(to: d.appending(path: "a.b-1.0.0"))
         #expect(removableExtensionFolders(in: d).isEmpty)
     }
+
+    @Test func entryWithOnlyLocationPathProtectsItsFolder() throws {
+        let d = try extDir([], folders: four, json: "[{\"identifier\":{\"id\":\"i\"},\"location\":{\"path\":\"/Users/u/.vscode/extensions/a.b-1.0.0\"}},{\"location\":{\"fsPath\":\"/x/ms-python.python-2026.4.0-darwin-arm64\"}}]")
+        #expect(removableExtensionFolders(in: d) == [])
+        let d2 = try extDir([], folders: four, json: "[{\"location\":{\"path\":\"/Users/u/.vscode/extensions/a.b-1.0.0\"}}]", at: "y")
+        #expect(removableExtensionFolders(in: d2) == ["ms-python.python-2026.4.0-darwin-arm64"])
+    }
+
+    @Test func entryWithNoLocationFailsClosed() throws {
+        let d = try extDir([], folders: four, json: "[{\"relativeLocation\":\"a.b-1.2.0\"},{\"identifier\":{\"id\":\"i\"}}]")
+        #expect(removableExtensionFolders(in: d).isEmpty)
+    }
 }
