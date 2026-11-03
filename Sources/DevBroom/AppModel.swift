@@ -19,7 +19,7 @@ func wholeGB(_ n: Int64) -> String {
 let isBundled = Bundle.main.bundleIdentifier != nil
 
 @MainActor @Observable final class AppModel {
-    let settings = AppSettings()
+    let settings: AppSettings
     var results: [CategoryResult] = []
     var selected: Set<String> = []
     var freeBytes: Int64?
@@ -38,8 +38,11 @@ let isBundled = Bundle.main.bundleIdentifier != nil
     @ObservationIgnored private let home = FileManager.default.homeDirectoryForCurrentUser
     @ObservationIgnored private let store = ScanStore(file: FileManager.default
         .homeDirectoryForCurrentUser.appending(path: "Library/Application Support/DevBroom/scan.json"))
+    /// Screenshot mode: fixed example data, never scans, saves or notifies.
+    @ObservationIgnored private var isDemo = false
 
     init() {
+        settings = AppSettings()
         store.load().forEach(land)
         totalBytes = (try? home.resourceValues(forKeys: [.volumeTotalCapacityKey]))?.volumeTotalCapacity.map(Int64.init)
         if isBundled {
@@ -49,6 +52,16 @@ let isBundled = Bundle.main.bundleIdentifier != nil
         timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
             MainActor.assumeIsolated { self.refreshFreeSpace() }
         }
+    }
+
+    init(demoSettings: AppSettings, results: [CategoryResult], freeBytes: Int64, totalBytes: Int64) {
+        settings = demoSettings
+        isDemo = true
+        self.results = results
+        self.freeBytes = freeBytes
+        self.totalBytes = totalBytes
+        selected = Set(results.flatMap(\.items)
+            .filter { defaultTicked($0, now: Date(), cutoffDays: demoSettings.cutoffDays) }.map(\.id))
     }
 
     // MARK: free space
@@ -68,7 +81,7 @@ let isBundled = Bundle.main.bundleIdentifier != nil
 
     func popoverOpened() {
         isOpen = true
-        rescan()
+        if !isDemo { rescan() }
     }
 
     func popoverClosed() {
@@ -149,7 +162,7 @@ let isBundled = Bundle.main.bundleIdentifier != nil
         save()
     }
 
-    private func save() { try? store.save(results) }
+    private func save() { if !isDemo { try? store.save(results) } }
 
     // MARK: selection
 

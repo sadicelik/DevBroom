@@ -7,6 +7,7 @@ struct DevBroomApp: App {
 
     init() {
         NSApplication.shared.setActivationPolicy(.accessory)
+        Screenshots.renderIfRequested()
         _model = State(initialValue: AppModel())
     }
 
