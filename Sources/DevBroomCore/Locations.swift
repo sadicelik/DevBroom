@@ -12,6 +12,7 @@ public struct Locations: Sendable {
         ["iOS", "watchOS", "tvOS", "visionOS"].map { h("Library/Developer/Xcode/\($0) DeviceSupport") }
     }
     public var wallpaperVideos: URL { h("Library/Application Support/com.apple.wallpaper/aerials/videos") }
+    public var huggingFaceHub: URL { h(".cache/huggingface/hub") }
     public var packageCaches: [(tool: String, url: URL, kind: CleanKind)] {
         [("npm", h(".npm"), .rebuilds), ("Yarn", h("Library/Caches/Yarn"), .rebuilds),
          ("pnpm", h("Library/pnpm/store"), .rebuilds), ("pip", h("Library/Caches/pip"), .rebuilds),

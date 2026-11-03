@@ -63,4 +63,40 @@ struct RemovalGuardTests {
         let g2 = RemovalGuard(locations: Locations(home: h.url), scanRoots: [root])
         #expect(!g2.allows(root.appending(path: "x/node_modules")))
     }
+
+    @Test func projectAndModelFolders() throws {
+        try h.make("p/entry/hvigorfile.ts"); try h.dir("p/entry/build")
+        try h.make("p/Cargo.toml"); try h.dir("p/target")
+        try h.make("p/.venv/pyvenv.cfg")
+        for p in ["p/entry/build", "p/target", "p/.venv", ".cache/huggingface/hub/models--a--b", "z/hf/hub/models--a--b"] {
+            try h.dir(p)
+            #expect(g.allows(u(p)), "\(p)")
+        }
+        try h.dir("p2/build"); try h.dir(".cache/huggingface/hub")
+        try h.make("m/build.gradle"); try h.make("m/build/run.sh")
+        try h.make("X.app/Contents/Cargo.toml"); try h.dir("X.app/Contents/target")
+        try h.make(".secret/p/Cargo.toml"); try h.dir(".secret/p/build")
+        try h.make("Library/p/build.gradle"); try h.dir("Library/p/build")
+        try h.make("p/.hvigor/build.gradle"); try h.dir("p/.hvigor/build")
+        try h.dir("z/hf/models--a--b")
+        let git = Process()
+        git.executableURL = URL(filePath: "/usr/bin/xcode-select"); git.arguments = ["-p"]
+        git.standardOutput = FileHandle.nullDevice; git.standardError = FileHandle.nullDevice
+        if (try? git.run()) != nil {
+            git.waitUntilExit()
+            if git.terminationStatus == 0 {
+                for a in [["init"], ["add", "."], ["commit", "-m", "x"]] {
+                    let q = Process(); q.executableURL = URL(filePath: "/usr/bin/git")
+                    q.arguments = ["-C", u("m").path, "-c", "user.name=t", "-c", "user.email=t@t"] + a
+                    q.standardOutput = FileHandle.nullDevice; q.standardError = FileHandle.nullDevice
+                    try q.run(); q.waitUntilExit()
+                }
+                #expect(!g.allows(u("m/build")), "git-tracked")
+            }
+        }
+        for p in ["p2/build", ".cache/huggingface", ".cache/huggingface/hub", "z/hf/models--a--b", "X.app/Contents/target",
+                  ".secret/p/build", "Library/p/build", "p/.hvigor/build"] {
+            #expect(!g.allows(u(p)), "\(p)")
+        }
+    }
 }

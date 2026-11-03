@@ -9,21 +9,33 @@ public struct RemovalGuard: Sendable {
         let categoryFolders: [[String]]
         let exact: [[String]]
         let scanRoots: [[String]]
+        let hub: [String]
 
-        func allows(_ p: [String]) -> Bool {
+        enum Match { case no, other, build }
+
+        func match(_ p: [String]) -> Match {
             // Never inside an app bundle (e.g. VS Code's bundled node_modules).
-            if p.contains(where: { $0.lowercased().hasSuffix(".app") }) { return false }
-            if exact.contains(p) { return true }
-            if categoryFolders.contains(where: { p.count == $0.count + 1 && p.starts(with: $0) }) { return true }
-            guard p.last == "node_modules",
-                  scanRoots.contains(where: { p.count > $0.count && p.starts(with: $0) }) else { return false }
+            if p.contains(where: { $0.lowercased().hasSuffix(".app") }) { return .no }
+            if exact.contains(p) { return .other }
+            if categoryFolders.contains(where: { p.count == $0.count + 1 && p.starts(with: $0) }) { return .other }
+            guard let last = p.last, p.count >= 2 else { return .no }
+            let isModel = last.hasPrefix("models--") || last.hasPrefix("datasets--")
+            if isModel, p.count == hub.count + 1, p.starts(with: hub) { return .other }
+            let isBuild = projectBuildFolderNames.contains(last)
+            guard last == "node_modules" || isBuild || (isModel && p[p.count - 2] == "hub"),
+                  scanRoots.contains(where: { p.count > $0.count && p.starts(with: $0) }) else { return .no }
+            let dotOK: Bool
             if p.starts(with: home), p.count > home.count {
                 // Inside home: judged relative to home; ~/Library excluded (APFS is case-insensitive).
-                if p[home.count].lowercased() == "library" { return false }
-                return !p.dropFirst(home.count).contains { $0.hasPrefix(".") }
+                if p[home.count].lowercased() == "library" { return .no }
+                dotOK = !p.dropFirst(home.count).dropLast().contains { $0.hasPrefix(".") }
+            } else {
+                // Outside home: every component counts.
+                dotOK = !p.dropFirst().dropLast().contains { $0.hasPrefix(".") }
             }
-            // Outside home: every component counts.
-            return !p.dropFirst().contains { $0.hasPrefix(".") }
+            // The last component may start with a dot only for .hvigor / .venv.
+            guard dotOK, !last.hasPrefix(".") || last == ".hvigor" || last == ".venv" else { return .no }
+            return isBuild ? .build : .other
         }
     }
 
@@ -36,7 +48,7 @@ public struct RemovalGuard: Sendable {
                   categoryFolders: ([locations.caches, locations.derivedData, locations.wallpaperVideos]
                     + locations.deviceSupportFolders).map(f),
                   exact: locations.packageCaches.map { f($0.url) },
-                  scanRoots: scanRoots.map(f))
+                  scanRoots: scanRoots.map(f), hub: f(locations.huggingFaceHub))
         }
         plain = make { $0.standardizedFileURL.pathComponents }
         resolved = make { $0.resolvingSymlinksInPath().pathComponents }
@@ -45,7 +57,12 @@ public struct RemovalGuard: Sendable {
     public func allows(_ url: URL) -> Bool {
         guard url.isFileURL, !url.pathComponents.contains("..") else { return false }
         if (try? url.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == true { return false }
-        return plain.allows(url.standardizedFileURL.pathComponents)
-            && resolved.allows(url.resolvingSymlinksInPath().pathComponents)
+        let a = plain.match(url.standardizedFileURL.pathComponents)
+        let b = resolved.match(url.resolvingSymlinksInPath().pathComponents)
+        guard a != .no, b != .no else { return false }
+        if a == .build || b == .build {
+            return buildEcosystem(of: url.standardizedFileURL) != nil && !gitTracksFiles(in: url)
+        }
+        return true
     }
 }
