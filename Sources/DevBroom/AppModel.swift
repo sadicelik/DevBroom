@@ -67,7 +67,6 @@ let isBundled = Bundle.main.bundleIdentifier != nil
     // MARK: scan
 
     func popoverOpened() {
-        refreshFreeSpace()
         isOpen = true
         rescan()
     }
@@ -80,6 +79,7 @@ let isBundled = Bundle.main.bundleIdentifier != nil
     }
 
     func rescan() {
+        refreshFreeSpace()
         scanTask?.cancel()
         for i in results.indices { results[i].status = .notUpdated }
         isScanning = true
