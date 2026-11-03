@@ -41,18 +41,28 @@ private func run(_ path: String, _ args: [String]) -> (status: Int32, out: Data)
     return (p.terminationStatus, data)
 }
 
-/// True only if git works and tracks at least one file in `folder`. Any failure gives false.
+private let developerToolsInstalled: Bool = run("/usr/bin/xcode-select", ["-p"])?.status == 0
+
+/// True if git tracks a file in `folder`, or if that cannot be ruled out (fails closed).
+/// False when developer tools are missing (check skipped), when no ancestor has a `.git` entry,
+/// or when `git ls-files` exits 0 with empty output. A non-zero exit or launch failure gives true.
 public func gitTracksFiles(in folder: URL) -> Bool {
     // Never run /usr/bin/git without developer tools: the stub opens an install dialog.
-    guard run("/usr/bin/xcode-select", ["-p"])?.status == 0,
-          let r = run("/usr/bin/git", ["-C", folder.path, "ls-files", "--", "."]) else { return false }
-    return r.status == 0 && !r.out.isEmpty
+    guard developerToolsInstalled else { return false }
+    var cur = folder.standardizedFileURL
+    while !FileManager.default.fileExists(atPath: cur.appending(path: ".git").path) {
+        if cur.pathComponents.count <= 1 { return false }
+        cur = cur.deletingLastPathComponent().standardizedFileURL
+    }
+    guard let r = run("/usr/bin/git", ["-C", folder.path, "ls-files", "--", "."]) else { return true }
+    return !(r.status == 0 && r.out.isEmpty)
 }
 
+/// Nearest of `m` and its ancestors strictly below `scanRoot` that holds a `.git` entry; else `m`.
 public func projectFolder(forMarkerFolder m: URL, scanRoot: URL) -> URL {
     let root = scanRoot.standardizedFileURL.pathComponents
     var cur = m.standardizedFileURL
-    while cur.pathComponents.count >= root.count, cur.pathComponents.starts(with: root) {
+    while cur.pathComponents.count > root.count, cur.pathComponents.starts(with: root) {
         if FileManager.default.fileExists(atPath: cur.appending(path: ".git").path) { return cur }
         cur = cur.deletingLastPathComponent()
     }

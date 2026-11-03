@@ -79,20 +79,9 @@ struct RemovalGuardTests {
         try h.make("Library/p/build.gradle"); try h.dir("Library/p/build")
         try h.make("p/.hvigor/build.gradle"); try h.dir("p/.hvigor/build")
         try h.dir("z/hf/models--a--b")
-        let git = Process()
-        git.executableURL = URL(filePath: "/usr/bin/xcode-select"); git.arguments = ["-p"]
-        git.standardOutput = FileHandle.nullDevice; git.standardError = FileHandle.nullDevice
-        if (try? git.run()) != nil {
-            git.waitUntilExit()
-            if git.terminationStatus == 0 {
-                for a in [["init"], ["add", "."], ["commit", "-m", "x"]] {
-                    let q = Process(); q.executableURL = URL(filePath: "/usr/bin/git")
-                    q.arguments = ["-C", u("m").path, "-c", "user.name=t", "-c", "user.email=t@t"] + a
-                    q.standardOutput = FileHandle.nullDevice; q.standardError = FileHandle.nullDevice
-                    try q.run(); q.waitUntilExit()
-                }
-                #expect(!g.allows(u("m/build")), "git-tracked")
-            }
+        if TempHome.gitAvailable {
+            try h.git(u("m"), "init"); try h.git(u("m"), "add", "-f", "."); try h.git(u("m"), "commit", "-m", "x")
+            #expect(!g.allows(u("m/build")), "git-tracked")
         }
         for p in ["p2/build", ".cache/huggingface", ".cache/huggingface/hub", "z/hf/models--a--b", "X.app/Contents/target",
                   ".secret/p/build", "Library/p/build", "p/.hvigor/build"] {

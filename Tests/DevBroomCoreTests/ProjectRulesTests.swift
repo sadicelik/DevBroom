@@ -31,30 +31,23 @@ struct ProjectRulesTests {
         #expect(buildEcosystem(of: try h.dir("a/other")) == nil)
     }
 
-    private func git(_ dir: URL, _ args: String...) throws {
-        let p = Process()
-        p.executableURL = URL(filePath: "/usr/bin/git")
-        p.arguments = ["-C", dir.path, "-c", "user.name=t", "-c", "user.email=t@t"] + args
-        p.standardOutput = FileHandle.nullDevice; p.standardError = FileHandle.nullDevice
-        try p.run(); p.waitUntilExit()
-    }
-    private var gitAvailable: Bool {
-        let p = Process()
-        p.executableURL = URL(filePath: "/usr/bin/xcode-select"); p.arguments = ["-p"]
-        p.standardOutput = FileHandle.nullDevice; p.standardError = FileHandle.nullDevice
-        return (try? p.run()) != nil && { p.waitUntilExit(); return p.terminationStatus == 0 }()
-    }
-
     @Test func gitTracking() throws {
-        guard gitAvailable else { return }
+        guard TempHome.gitAvailable else { return }
         let tracked = try h.dir("tracked")
-        try git(tracked, "init"); try h.make("tracked/build/script.sh")
-        try git(tracked, "add", "."); try git(tracked, "commit", "-m", "x")
+        try h.git(tracked, "init"); try h.make("tracked/build/script.sh")
+        try h.git(tracked, "add", "-f", "."); try h.git(tracked, "commit", "-m", "x")
         #expect(gitTracksFiles(in: tracked.appending(path: "build")))
         let untracked = try h.dir("untracked")
-        try git(untracked, "init"); try h.make("untracked/build/out.o")
+        try h.git(untracked, "init"); try h.make("untracked/build/out.o")
         #expect(!gitTracksFiles(in: untracked.appending(path: "build")))
         #expect(!gitTracksFiles(in: try h.dir("norepo/build")))
+    }
+
+    @Test func unreadableRepoFailsClosed() throws {
+        guard TempHome.gitAvailable else { return }
+        try h.make("bad/.git", bytes: 0)  // .git is an empty file: git cannot read the repo
+        try h.make("bad/build/out.o")
+        #expect(gitTracksFiles(in: h.url.appending(path: "bad/build")))
     }
 
     @Test func projectFolderRules() throws {
@@ -65,6 +58,10 @@ struct ProjectRulesTests {
         #expect(projectFolder(forMarkerFolder: h.url.appending(path: "root/q/entry"), scanRoot: root).lastPathComponent == "entry")
         try h.dir(".git")  // above the scan root: ignored
         #expect(projectFolder(forMarkerFolder: h.url.appending(path: "root/q/entry"), scanRoot: root).lastPathComponent == "entry")
+        try h.dir("root/.git")  // exactly at the scan root: ignored
+        let m = h.url.appending(path: "root/q/entry")
+        #expect(projectFolder(forMarkerFolder: m, scanRoot: root) == m)
+        #expect(projectFolder(forMarkerFolder: m, scanRoot: URL(filePath: "/")).path != "/")  // terminates; h/.git is the nearest repo
     }
 
     @Test func modelNames() {

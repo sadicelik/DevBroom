@@ -25,3 +25,26 @@ struct TempHome {
         return d
     }
 }
+
+extension TempHome {
+    static let gitAvailable: Bool = {
+        let p = Process()
+        p.executableURL = URL(filePath: "/usr/bin/xcode-select"); p.arguments = ["-p"]
+        p.standardOutput = FileHandle.nullDevice; p.standardError = FileHandle.nullDevice
+        guard (try? p.run()) != nil else { return false }
+        p.waitUntilExit()
+        return p.terminationStatus == 0
+    }()
+
+    /// Runs git in `dir` with a hermetic config; fails the calling test if git exits non-zero.
+    func git(_ dir: URL, _ args: String...) throws {
+        let p = Process()
+        p.executableURL = URL(filePath: "/usr/bin/git")
+        p.arguments = ["-C", dir.path, "-c", "user.name=t", "-c", "user.email=t@t",
+                       "-c", "core.excludesFile=/dev/null", "-c", "commit.gpgsign=false"] + args
+        p.standardOutput = FileHandle.nullDevice; p.standardError = FileHandle.nullDevice
+        try p.run(); p.waitUntilExit()
+        struct GitFailed: Error { let args: [String] }
+        guard p.terminationStatus == 0 else { throw GitFailed(args: args) }
+    }
+}
