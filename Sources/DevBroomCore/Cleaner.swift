@@ -53,10 +53,10 @@ public func deleteFromTrash(_ items: [TrashedItem],
     var bytes: Int64 = 0, failures: [String] = []
     for item in items {
         let url = item.url, name = url.lastPathComponent
+        guard let now = FileIdentity(url) else { continue }  // already emptied or put back: nothing to do
         guard isTrash(url.standardizedFileURL.deletingLastPathComponent(), url) else {
             failures.append("\(name): not in the Trash"); continue
         }
-        guard let now = FileIdentity(url) else { continue }  // already emptied or put back
         guard let then = item.identity, then == now else {
             failures.append("\(name): changed since cleaning, left in the Trash"); continue
         }

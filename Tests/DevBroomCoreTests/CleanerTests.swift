@@ -90,6 +90,18 @@ private func cleanItem(_ id: String, _ method: RemovalMethod, bytes: Int64 = 100
         #expect(FileManager.default.fileExists(atPath: landed.path))
     }
 
+    /// Real ~/.Trash and the default Trash check: one tiny temp folder is trashed, deleted, then reported as already gone.
+    @Test func deleteFromTrashWithRealTrash() throws {
+        let d = try h.make("DevBroomPurgeTest-\(UUID().uuidString)/f").deletingLastPathComponent()
+        var out: NSURL?
+        try FileManager.default.trashItem(at: d, resultingItemURL: &out)
+        let item = TrashedItem(url: try #require(out as URL?), bytes: 7)
+        let first = deleteFromTrash([item])
+        #expect(first.bytes == 7 && first.failures.isEmpty)
+        let again = deleteFromTrash([item])
+        #expect(again.bytes == 0 && again.failures.isEmpty)
+    }
+
     @Test func deleteFromTrashRefusesPathsOutsideTheTrash() throws {
         let f = try h.make("Library/Caches/com.b/f")
         let fake = try h.make("proj/.Trash/src")  // a folder merely named .Trash
