@@ -90,13 +90,13 @@ let isBundled = Bundle.main.bundleIdentifier != nil
         let tools = ToolScanners(runner: ProcessRunner(), home: home, now: now, cutoffDays: settings.cutoffDays)
         scanTask = Task {
             await withTaskGroup(of: (CategoryID, ScanOutcome).self) { group in
-                for id in CategoryID.allCases {
+                for id in CategoryID.allCases where id != .projectBuilds && id != .aiModels {
                     group.addTask { (id, await Self.scan(id, files: files, tools: tools)) }
                 }
                 for await (id, outcome) in group {
                     if Task.isCancelled { break }
                     switch outcome {
-                    case .result(let r): land(r)
+                    case .result(let rs): rs.forEach(land)
                     case .hidden: results.removeAll { $0.id == id }; save()
                     case .cancelled: break
                     }
@@ -106,21 +106,22 @@ let isBundled = Bundle.main.bundleIdentifier != nil
         }
     }
 
-    private enum ScanOutcome: Sendable { case result(CategoryResult), hidden, cancelled }
+    private enum ScanOutcome: Sendable { case result([CategoryResult]), hidden, cancelled }
 
     private nonisolated static func scan(_ id: CategoryID, files: FileScanners, tools: ToolScanners) async -> ScanOutcome {
-        let work: @Sendable () throws -> CategoryResult
+        let work: @Sendable () throws -> [CategoryResult]
         switch id {
-        case .simDevices: return .result(await tools.simDevices())
-        case .simRuntimes: return .result(await tools.simRuntimes())
-        case .docker: return await tools.docker().map(ScanOutcome.result) ?? .hidden
-        case .projectBuilds, .aiModels, .oldExtensions: return .hidden
-        case .derivedData: work = { try files.derivedData() }
-        case .packageCaches: work = { try files.packageCaches() }
-        case .appCaches: work = { try files.appCaches() }
-        case .nodeModules: work = { try files.nodeModules() }
-        case .deviceSupport: work = { try files.deviceSupport() }
-        case .wallpaper: work = { try files.wallpaper() }
+        case .simDevices: return .result([await tools.simDevices()])
+        case .simRuntimes: return .result([await tools.simRuntimes()])
+        case .docker: return await tools.docker().map { ScanOutcome.result([$0]) } ?? .hidden
+        case .oldExtensions: return .hidden
+        case .projectBuilds, .aiModels: return .cancelled  // landed by the .nodeModules job
+        case .derivedData: work = { [try files.derivedData()] }
+        case .packageCaches: work = { [try files.packageCaches()] }
+        case .appCaches: work = { [try files.appCaches()] }
+        case .nodeModules: work = { try files.projects() }
+        case .deviceSupport: work = { [try files.deviceSupport()] }
+        case .wallpaper: work = { [try files.wallpaper()] }
         }
         // Detached keeps the file walk off the main actor; it does not inherit cancellation, so forward it.
         let task = Task.detached(priority: .utility) { try work() }
@@ -129,7 +130,8 @@ let isBundled = Bundle.main.bundleIdentifier != nil
         } catch is CancellationError {
             return .cancelled
         } catch {
-            return .result(CategoryResult(id: id, items: [], status: .unavailable(error.localizedDescription)))
+            let ids: [CategoryID] = id == .nodeModules ? [.nodeModules, .projectBuilds, .aiModels] : [id]
+            return .result(ids.map { CategoryResult(id: $0, items: [], status: .unavailable(error.localizedDescription)) })
         }
     }
 
@@ -174,12 +176,10 @@ let isBundled = Bundle.main.bundleIdentifier != nil
         let stale = Set(results.filter { $0.status == .notUpdated }.map(\.id))
         var unticked: [String] = []
         for item in selectedItems where stale.contains(item.category) {
-            guard case .trash(let url) = item.method,
-                  !isRecentlyUsed(item.lastUsed, now: now, cutoffDays: cutoff) else { continue }
-            let node = item.category == .nodeModules
-            let target = node ? url.deletingLastPathComponent() : url
+            guard !isRecentlyUsed(item.lastUsed, now: now, cutoffDays: cutoff),
+                  let (target, skipping) = usageFolder(for: item, scanRoots: settings.scanRoots) else { continue }
             let newest = await Task.detached {
-                try? folderStats(target, skipping: node ? ["node_modules"] : []).newestModification
+                try? folderStats(target, skipping: skipping).newestModification
             }.value
             if isRecentlyUsed(newest ?? nil, now: now, cutoffDays: cutoff) {
                 selected.remove(item.id)

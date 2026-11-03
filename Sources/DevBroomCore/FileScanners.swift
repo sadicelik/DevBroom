@@ -70,9 +70,10 @@ public struct FileScanners: Sendable {
         return result(.wallpaper, items)
     }
 
-    public func nodeModules() throws -> CategoryResult {
+    /// One walk of the scan roots for node_modules, build folders and model hubs, plus the HF cache.
+    public func projects() throws -> [CategoryResult] {
         let library = locations.home.appendingPathComponent("Library").standardizedFileURL.path
-        var items: [CleanItem] = []
+        var nodes: [CleanItem] = [], builds: [CleanItem] = [], models: [CleanItem] = []
         var seen: Set<String> = []
         for root in scanRoots {
             guard let en = FileManager.default.enumerator(
@@ -85,6 +86,26 @@ public struct FileScanners: Sendable {
                 guard let v = try? u.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]),
                       v.isDirectory == true, v.isSymbolicLink != true else { continue }
                 let name = u.lastPathComponent
+                if projectBuildFolderNames.contains(name), let eco = buildEcosystem(of: u) {
+                    if gitTracksFiles(in: u) { en.skipDescendants(); continue }
+                    en.skipDescendants()
+                    guard seen.insert(u.standardizedFileURL.path).inserted else { continue }
+                    let marker = u.deletingLastPathComponent()
+                    let project = projectFolder(forMarkerFolder: marker, scanRoot: root)
+                    var it = try makeItem(.projectBuilds, u, name: "\(project.lastPathComponent) · \(eco.rawValue) \(name)",
+                                          detail: abbreviate(marker.path))
+                    try setUsage(&it)
+                    builds.append(it)
+                    continue
+                }
+                if name == "hub" {
+                    let hits = try children(u).filter { modelDisplayName($0.lastPathComponent) != nil }
+                    if !hits.isEmpty {
+                        en.skipDescendants()
+                        for m in hits where seen.insert(m.standardizedFileURL.path).inserted { models.append(try modelItem(m)) }
+                        continue
+                    }
+                }
                 if name.hasPrefix(".") || u.standardizedFileURL.path == library { en.skipDescendants(); continue }
                 if name == "node_modules" {
                     en.skipDescendants()
@@ -92,16 +113,29 @@ public struct FileScanners: Sendable {
                     // Only project folders; skips global installs like ~/n/lib/node_modules.
                     guard exists(parent.appendingPathComponent("package.json")),
                           seen.insert(u.standardizedFileURL.path).inserted else { continue }
-                    let lastUsed = try folderStats(parent, skipping: ["node_modules"]).newestModification
                     var it = try makeItem(.nodeModules, u, name: parent.lastPathComponent, detail: abbreviate(parent.path))
-                    it.lastUsed = lastUsed
-                    it.tags.remove(.recentlyUsed)
-                    if isRecentlyUsed(lastUsed, now: now, cutoffDays: cutoffDays) { it.tags.insert(.recentlyUsed) }
-                    items.append(it)
+                    try setUsage(&it)
+                    nodes.append(it)
                 }
             }
         }
-        return result(.nodeModules, items)
+        for m in try children(locations.huggingFaceHub) where modelDisplayName(m.lastPathComponent) != nil {
+            if seen.insert(m.standardizedFileURL.path).inserted { models.append(try modelItem(m)) }
+        }
+        return [result(.nodeModules, nodes), result(.projectBuilds, builds), result(.aiModels, models)]
+    }
+
+    private func modelItem(_ u: URL) throws -> CleanItem {
+        try makeItem(.aiModels, u, name: modelDisplayName(u.lastPathComponent) ?? u.lastPathComponent, detail: abbreviate(u.path))
+    }
+
+    /// lastUsed from the item's usage folder (see `usageFolder`), so scan and re-check share one rule.
+    private func setUsage(_ it: inout CleanItem) throws {
+        guard let (folder, skipping) = usageFolder(for: it, scanRoots: scanRoots) else { return }
+        let lastUsed = try folderStats(folder, skipping: skipping).newestModification
+        it.lastUsed = lastUsed
+        it.tags.remove(.recentlyUsed)
+        if isRecentlyUsed(lastUsed, now: now, cutoffDays: cutoffDays) { it.tags.insert(.recentlyUsed) }
     }
 
     // MARK: helpers

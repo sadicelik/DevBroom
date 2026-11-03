@@ -5,6 +5,18 @@ final class FileScannersTests: XCTestCase {
     private func scanners(_ h: TempHome, running: Set<String> = []) -> FileScanners {
         FileScanners(locations: Locations(home: h.url), scanRoots: [h.url], now: now, cutoffDays: 14, runningBundleIDs: running)
     }
+    private func repo(_ h: TempHome, _ rel: String) throws {
+        if TempHome.gitAvailable { try h.git(try h.dir(rel), "init") } else { try h.dir(rel + "/.git") }
+    }
+    private func result(_ r: [CategoryResult], _ id: CategoryID) -> CategoryResult { r.first { $0.id == id }! }
+    private func hmosProject(_ h: TempHome) throws {
+        try repo(h, "p")
+        try h.make("p/package.json", modified: ago(100))
+        try h.make("p/node_modules/x", modified: ago(100))
+        try h.make("p/entry/hvigorfile.ts", modified: ago(100))
+        try h.make("p/entry/build/x", modified: ago(100))
+        try h.make("p/src/a.ets", modified: ago(100))
+    }
     private func ago(_ d: Double) -> Date { now.addingTimeInterval(-d * 86_400) }
 
     func testStatsSumsAndNewest() throws {
@@ -51,7 +63,7 @@ final class FileScannersTests: XCTestCase {
         try h.make("Library/p/package.json")
         try h.make("Library/p/node_modules/z")
         try h.make("code/b/src/f")
-        let r = try scanners(h).nodeModules()
+        let r = try scanners(h).projects().first { $0.id == .nodeModules }!
         XCTAssertEqual(r.items.count, 1)
         XCTAssertTrue(r.items[0].id.hasSuffix("code/a/node_modules"))
         XCTAssertEqual(r.items[0].name, "a")
@@ -61,7 +73,7 @@ final class FileScannersTests: XCTestCase {
         let h = try TempHome()
         try h.make("code/a/package.json", modified: ago(2))
         try h.make("code/a/node_modules/x", modified: ago(100))
-        let r = try scanners(h).nodeModules()
+        let r = try scanners(h).projects().first { $0.id == .nodeModules }!
         XCTAssertTrue(r.items[0].tags.contains(.recentlyUsed))
     }
 
@@ -72,7 +84,7 @@ final class FileScannersTests: XCTestCase {
         try h.make("n/lib/node_modules/npm/f")
         try h.make("code/a/package.json")
         try h.make("code/a/node_modules/x")
-        let r = try scanners(h).nodeModules()
+        let r = try scanners(h).projects().first { $0.id == .nodeModules }!
         XCTAssertEqual(r.items.map(\.name), ["a"])
     }
 
@@ -82,7 +94,7 @@ final class FileScannersTests: XCTestCase {
         try h.make("code/a/node_modules/x")
         let s = FileScanners(locations: Locations(home: h.url), scanRoots: [h.url, h.url.appending(path: "code")],
                              now: now, cutoffDays: 14, runningBundleIDs: [])
-        XCTAssertEqual(try s.nodeModules().items.count, 1)
+        XCTAssertEqual(try s.projects().first { $0.id == .nodeModules }!.items.count, 1)
     }
 
     func testNodeModulesUnderHiddenRootNotListed() throws {
@@ -91,7 +103,7 @@ final class FileScannersTests: XCTestCase {
         try h.make(".hidden/code/a/node_modules/x")
         let s = FileScanners(locations: Locations(home: h.url), scanRoots: [h.url.appending(path: ".hidden/code")],
                              now: now, cutoffDays: 14, runningBundleIDs: [])
-        XCTAssertTrue(try s.nodeModules().items.isEmpty)
+        XCTAssertTrue(try s.projects().first { $0.id == .nodeModules }!.items.isEmpty)
     }
 
     func testDeviceSupportHandlesSpaces() throws {
@@ -113,7 +125,7 @@ final class FileScannersTests: XCTestCase {
     func testMissingFoldersGiveEmptyResult() throws {
         let s = scanners(try TempHome())
         for r in [try s.derivedData(), try s.packageCaches(), try s.appCaches(),
-                  try s.deviceSupport(), try s.wallpaper(), try s.nodeModules()] {
+                  try s.deviceSupport(), try s.wallpaper(), try s.projects().first { $0.id == .nodeModules }!] {
             XCTAssertTrue(r.items.isEmpty)
         }
     }
@@ -122,7 +134,7 @@ final class FileScannersTests: XCTestCase {
         let h = try TempHome()
         try h.make("code/a/package.json", modified: ago(100))
         try h.make("code/a/node_modules/x", modified: ago(1))
-        let r = try scanners(h).nodeModules()
+        let r = try scanners(h).projects().first { $0.id == .nodeModules }!
         XCTAssertEqual(r.items.count, 1)
         XCTAssertFalse(r.items[0].tags.contains(.recentlyUsed))
     }
@@ -137,5 +149,66 @@ final class FileScannersTests: XCTestCase {
         try h.make("Library/Caches/real/f")
         XCTAssertEqual(try folderStats(link).allocatedBytes, 0)
         XCTAssertEqual(try scanners(h).appCaches().items.map(\.detail), ["real"])
+    }
+
+    func testProjectWalkFindsBuildsAndKeepsNodeModules() throws {
+        let h = try TempHome()
+        try hmosProject(h)
+        let r = try scanners(h).projects()
+        XCTAssertEqual(r.map(\.id), [.nodeModules, .projectBuilds, .aiModels])
+        XCTAssertEqual(result(r, .nodeModules).items.count, 1)
+        let b = result(r, .projectBuilds).items
+        XCTAssertEqual(b.map(\.name), ["p · HarmonyOS build"])
+        XCTAssertTrue(b.first?.detail.hasSuffix("/p/entry") == true)
+        XCTAssertFalse(b[0].tags.contains(.recentlyUsed))
+    }
+
+    func testSiblingEditMarksBuildRecent() throws {
+        let h = try TempHome()
+        try hmosProject(h)
+        try h.make("p/feature/x.ets", modified: ago(0))
+        let b = result(try scanners(h).projects(), .projectBuilds).items
+        XCTAssertEqual(b.count, 1)
+        XCTAssertTrue(b[0].tags.contains(.recentlyUsed))
+    }
+
+    func testUnmarkedBuildIsWalkedInto() throws {
+        let h = try TempHome()
+        try h.make("a/build/inner/Cargo.toml")
+        try h.make("a/build/inner/target/x")
+        let b = result(try scanners(h).projects(), .projectBuilds).items
+        XCTAssertEqual(b.count, 1)
+        XCTAssertTrue(b[0].id.hasSuffix("a/build/inner/target"))
+    }
+
+    func testGitTrackedBuildSkipped() throws {
+        try XCTSkipUnless(TempHome.gitAvailable)
+        let h = try TempHome()
+        try h.make("p/build.gradle")
+        try h.make("p/build/script.sh")
+        try h.git(try h.dir("p"), "init")
+        try h.git(h.url.appending(path: "p"), "add", "-A")
+        try h.git(h.url.appending(path: "p"), "commit", "-m", "x")
+        XCTAssertTrue(result(try scanners(h).projects(), .projectBuilds).items.isEmpty)
+    }
+
+    func testHubModels() throws {
+        let h = try TempHome()
+        try h.make("z/hf/hub/models--facebook--nllb/x")
+        try h.make(".cache/huggingface/hub/models--a--b/x")
+        try h.make("y/hub/notes.txt")
+        let m = result(try scanners(h).projects(), .aiModels).items
+        XCTAssertEqual(Set(m.map(\.name)), ["facebook/nllb", "a/b"])
+        XCTAssertEqual(m.count, 2)
+        XCTAssertTrue(m.allSatisfy { $0.kind == .redownload })
+    }
+
+    func testDotBuildFolders() throws {
+        let h = try TempHome()
+        try h.make("p/.venv/pyvenv.cfg")
+        try h.make(".hidden/q/build.gradle")
+        try h.make(".hidden/q/build/x")
+        let b = result(try scanners(h).projects(), .projectBuilds).items
+        XCTAssertEqual(b.map(\.name), ["p · Python .venv"])
     }
 }

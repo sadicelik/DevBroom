@@ -77,3 +77,18 @@ public func modelDisplayName(_ folderName: String) -> String? {
     }
     return nil
 }
+
+/// Folder whose newest file counts as "project in use" for a trash item, and names to leave out of that scan.
+public func usageFolder(for item: CleanItem, scanRoots: [URL]) -> (folder: URL, skipping: Set<String>)? {
+    guard case .trash(let url) = item.method else { return nil }
+    let parent = url.deletingLastPathComponent()
+    switch item.category {
+    case .nodeModules: return (parent, ["node_modules"])
+    case .projectBuilds:
+        let comps = url.standardizedFileURL.pathComponents
+        let root = scanRoots.first { comps.starts(with: $0.standardizedFileURL.pathComponents) }
+        let project = root.map { projectFolder(forMarkerFolder: parent, scanRoot: $0) } ?? parent
+        return (project, projectBuildFolderNames.union(["node_modules"]))
+    default: return (url, [])
+    }
+}

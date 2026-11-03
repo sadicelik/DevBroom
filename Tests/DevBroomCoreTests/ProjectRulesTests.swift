@@ -70,4 +70,25 @@ struct ProjectRulesTests {
         #expect(modelDisplayName("models--b") == "b")
         #expect(modelDisplayName("other") == nil)
     }
+
+    private func item(_ c: CategoryID, _ u: URL) -> CleanItem {
+        CleanItem(id: u.path, category: c, name: "n", detail: "", sizeBytes: 1, lastUsed: nil, method: .trash(u), tags: [])
+    }
+
+    @Test func usageFolderRules() throws {
+        let nm = try h.dir("u/node_modules")
+        let a = usageFolder(for: item(.nodeModules, nm), scanRoots: [h.url])
+        #expect(a?.folder == nm.deletingLastPathComponent() && a?.skipping == ["node_modules"])
+        try h.dir("p/.git")
+        let b = try h.dir("p/entry/build")
+        let r = usageFolder(for: item(.projectBuilds, b), scanRoots: [h.url])
+        #expect(r?.folder.standardizedFileURL == h.url.appending(path: "p").standardizedFileURL)
+        #expect(r?.skipping == projectBuildFolderNames.union(["node_modules"]))
+        let outside = usageFolder(for: item(.projectBuilds, b), scanRoots: [])
+        #expect(outside?.folder == b.deletingLastPathComponent())
+        let plain = usageFolder(for: item(.appCaches, b), scanRoots: [h.url])
+        #expect(plain?.folder == b && plain?.skipping == [])
+        var cmd = item(.docker, b); cmd.method = .dockerPrune
+        #expect(usageFolder(for: cmd, scanRoots: [h.url]) == nil)
+    }
 }
