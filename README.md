@@ -12,6 +12,10 @@ Requires macOS 14 or later. Universal binary (Apple silicon and Intel).
 2. Move `DevBroom.app` to `/Applications` and open it.
 3. DevBroom is ad-hoc signed, not notarized, so macOS blocks the first launch. Open **System Settings > Privacy & Security**, scroll to the message about DevBroom and click **Open Anyway**. This is needed only once.
    Alternatively, remove the quarantine flag in Terminal: `xattr -dr com.apple.quarantine /Applications/DevBroom.app`
+4. At first launch DevBroom asks to send notifications (used only for the low disk space alert).
+5. On the first scan macOS may ask to let DevBroom read Desktop, Documents or Downloads, because the default node_modules search root is your home folder. Denying only skips that folder. You can narrow the scan roots in Settings.
+
+Items moved to the Trash free their space only after you empty the Trash.
 
 ## What it cleans
 
