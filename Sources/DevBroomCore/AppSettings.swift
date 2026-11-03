@@ -11,22 +11,32 @@ public final class AppSettings {
     public var scanRoots: [URL] { didSet { defaults.set(scanRoots.map(\.path), forKey: "scanRoots") } }
     public private(set) var launchAtLoginError: String?
 
+    @ObservationIgnored private let registrar: (Bool) throws -> Void
+    @ObservationIgnored private var isReverting = false
+
     public var launchAtLogin: Bool {
         didSet {
-            guard launchAtLogin != oldValue else { return }
+            // The @Observable setter re-fires didSet on revert, so skip that re-entry.
+            guard !isReverting, launchAtLogin != oldValue else { return }
             do {
-                if launchAtLogin { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
+                try registrar(launchAtLogin)
                 launchAtLoginError = nil
                 defaults.set(launchAtLogin, forKey: "launchAtLogin")
             } catch {
                 launchAtLoginError = error.localizedDescription
-                launchAtLogin = oldValue // re-enters didSet; equal-guard stops it after one revert
+                isReverting = true
+                launchAtLogin = oldValue
+                isReverting = false
             }
         }
     }
 
-    public init(defaults: UserDefaults = .standard, home: URL = FileManager.default.homeDirectoryForCurrentUser) {
+    public init(defaults: UserDefaults = .standard, home: URL = FileManager.default.homeDirectoryForCurrentUser,
+                registrar: @escaping (Bool) throws -> Void = { on in
+                    if on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
+                }) {
         self.defaults = defaults
+        self.registrar = registrar
         cutoffDays = defaults.object(forKey: "cutoffDays") as? Int ?? 14
         lowSpaceLimitGB = defaults.object(forKey: "lowSpaceLimitGB") as? Int ?? 15
         scanRoots = (defaults.stringArray(forKey: "scanRoots") ?? [home.path]).map { URL(fileURLWithPath: $0) }

@@ -46,4 +46,31 @@ struct StoreAndFreeSpaceTests {
         let b = freeBytes(at: FileManager.default.homeDirectoryForCurrentUser)
         #expect(b != nil && b! > 0)
     }
+
+    private final class Calls { var log: [Bool] = [] }
+    private struct Boom: Error {}
+
+    private func make(fail: Bool, _ c: Calls) -> (AppSettings, UserDefaults) {
+        let d = UserDefaults(suiteName: UUID().uuidString)!
+        let s = AppSettings(defaults: d, registrar: { on in c.log.append(on); if fail { throw Boom() } })
+        return (s, d)
+    }
+
+    @Test func launchAtLoginSuccess() {
+        let c = Calls(); let (s, d) = make(fail: false, c)
+        s.launchAtLogin = true
+        #expect(s.launchAtLogin && d.bool(forKey: "launchAtLogin") && c.log == [true] && s.launchAtLoginError == nil)
+    }
+
+    @Test func launchAtLoginFailureReverts() {
+        let c = Calls(); let (s, d) = make(fail: true, c)
+        s.launchAtLogin = true
+        #expect(!s.launchAtLogin && !d.bool(forKey: "launchAtLogin") && c.log == [true] && s.launchAtLoginError != nil)
+    }
+
+    @Test func launchAtLoginSameValueNoCall() {
+        let c = Calls(); let (s, _) = make(fail: false, c)
+        s.launchAtLogin = false
+        #expect(c.log.isEmpty)
+    }
 }
