@@ -52,6 +52,16 @@ private func cleanItem(_ id: String, _ method: RemovalMethod, bytes: Int64 = 100
         #expect(!FileManager.default.fileExists(atPath: d.path))
     }
 
+    /// Uses the real FileManager.trashItem: moves one tiny temp folder to the owner's Trash.
+    @Test func defaultTrashClosureTrashes() async throws {
+        let d = try h.make("Library/Caches/DevBroomTest-\(UUID().uuidString)/f").deletingLastPathComponent()
+        let real = Cleaner(removalGuard: RemovalGuard(locations: Locations(home: h.url), scanRoots: [h.url]),
+                           runner: runner, home: h.url)
+        let r = await real.clean([cleanItem("a", .trash(d))]) { _, _ in }
+        #expect(r.outcomes["a"] == .trashed(bytes: 100))
+        #expect(!FileManager.default.fileExists(atPath: d.path))
+    }
+
     @Test func trashesPathWithSpaces() async throws {
         let d = try h.make("Library/Developer/Xcode/iOS DeviceSupport/18.1 (22B83)/f").deletingLastPathComponent()
         let r = await cleaner.clean([cleanItem("a", .trash(d))]) { _, _ in }
