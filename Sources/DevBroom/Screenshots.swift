@@ -21,6 +21,12 @@ import SwiftUI
         render(CleanSheet(model: model, items: model.selectedItems, recentlyUnticked: [], dismiss: {}).padding(12),
                width: 424, to: dir.appending(path: "clean-summary.png"))
         render(SettingsView(settings: settings), width: 440, to: dir.appending(path: "settings.png"))
+        var report = CleanReport()
+        report.trashedBytes = model.selectedBytes
+        report.trashedItems = model.selectedItems.map { (URL(fileURLWithPath: "/Users/you/.Trash/\($0.name)"), $0.sizeBytes) }
+        model.lastReport = report
+        render(CleanSheet(model: model, items: [], recentlyUnticked: [], dismiss: {}).padding(12),
+               width: 424, to: dir.appending(path: "clean-done.png"))
         exit(0)
     }
 

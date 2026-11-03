@@ -9,6 +9,7 @@ struct CleanSheet: View {
     let dismiss: () -> Void
 
     @State private var understood = false
+    @State private var confirmPurge = false
 
     var body: some View {
         let trash = items.filter { !$0.method.isPermanent }
@@ -16,7 +17,8 @@ struct CleanSheet: View {
         VStack(alignment: .leading, spacing: 10) {
             if let report = model.lastReport {
                 result(report)
-                Button("Done") { model.lastReport = nil; dismiss() }.keyboardShortcut(.defaultAction)
+                purge(report)
+                Button("Done") { model.lastReport = nil; model.trashPurge = nil; dismiss() }.keyboardShortcut(.defaultAction)
             } else if model.isCleaning {
                 let p = model.cleanProgress ?? (0, items.count)
                 ProgressView("Cleaning \(p.done) of \(p.total)", value: Double(p.done), total: Double(max(p.total, 1)))
@@ -47,6 +49,7 @@ struct CleanSheet: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func section(_ title: String, _ items: [CleanItem], color: Color) -> some View {
@@ -73,8 +76,31 @@ struct CleanSheet: View {
         .foregroundStyle(color)
     }
 
+    /// "Delete from Trash now": only the items this clean moved, after a second confirmation.
+    @ViewBuilder private func purge(_ r: CleanReport) -> some View {
+        let size = r.trashedItems.reduce(0) { $0 + $1.bytes }
+        if let p = model.trashPurge {
+            Text("Deleted \(bytes(p.bytes)) from the Trash").foregroundStyle(.green)
+            ForEach(p.failures, id: \.self) { Text($0).font(.caption).foregroundStyle(.red) }
+        } else if !r.trashedItems.isEmpty {
+            if confirmPurge {
+                Text("This permanently deletes only what DevBroom just moved to the Trash. It can't be undone.")
+                    .font(.caption).foregroundStyle(.red)
+                HStack {
+                    Button("Cancel") { confirmPurge = false }
+                    Button("Delete \(bytes(size)) permanently", role: .destructive) { model.deleteTrashed() }
+                        .disabled(model.isPurging)
+                }
+            } else {
+                Button("Delete \(bytes(size)) from Trash now") { confirmPurge = true }
+            }
+        }
+    }
+
     @ViewBuilder private func result(_ r: CleanReport) -> some View {
-        Text("Moved \(bytes(r.trashedBytes)) to Trash · Deleted \(bytes(r.deletedBytes)) permanently")
+        let parts = [r.trashedBytes > 0 ? "Moved \(bytes(r.trashedBytes)) to the Trash" : nil,
+                     r.deletedBytes > 0 ? "Deleted \(bytes(r.deletedBytes)) permanently" : nil].compactMap { $0 }
+        Text(parts.isEmpty ? "Nothing was removed" : parts.joined(separator: " · ")).font(.headline)
         if case .deleted = r.outcomes["docker"] {
             Text("Docker: space returns within a few minutes").font(.caption).foregroundStyle(.secondary)
         }

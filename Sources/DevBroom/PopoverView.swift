@@ -25,6 +25,8 @@ struct PopoverView: View {
     let model: AppModel
     /// Snapshot taken when the summary opens (spec section 4 rule 4): exactly these items are shown and cleaned.
     @State private var cleanSheet: (items: [CleanItem], recent: [String])?
+    /// Height of the category list's content, so the panel fits it (up to a maximum) instead of a fixed size.
+    @State private var listHeight: CGFloat = 0
 
     var body: some View {
         // VStack, not Group: Group would forward onAppear/onDisappear to each swapped child.
@@ -53,8 +55,9 @@ struct PopoverView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(model.results) { CategoryRow(model: model, category: $0) }
                 }
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listHeight = $0 }
             }
-            .frame(height: 380)
+            .frame(height: min(max(listHeight, 40), 420))
             Divider()
             HStack {
                 Button("Clean \(bytes(model.selectedBytes))") {
@@ -74,13 +77,34 @@ struct PopoverView: View {
     }
 
     private var header: some View {
-        HStack {
-            if let free = model.freeBytes, let total = model.totalBytes {
-                Text("\(bytes(total - free)) used · \(bytes(free)) free").font(.headline)
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 2) {
+                if let free = model.freeBytes, let total = model.totalBytes {
+                    Text("\(bytes(total - free)) used · \(bytes(free)) free").font(.headline)
+                }
+                HStack(spacing: 6) {
+                    if model.selectedBytes > 0 {
+                        Text("\(bytes(model.selectedBytes)) ready to clean").foregroundStyle(.tint)
+                    }
+                    scannedText
+                }
+                .font(.caption)
             }
             Spacer()
             if model.isScanning { ProgressView().controlSize(.small) }
             Button("Rescan") { model.rescan() }.disabled(model.isScanning)
+        }
+    }
+
+    @ViewBuilder private var scannedText: some View {
+        if model.isScanning {
+            Text("Scanning…").foregroundStyle(.secondary)
+        } else if let date = model.lastScanned {
+            TimelineView(.periodic(from: .now, by: 60)) { context in
+                Text("Scanned " + (date > context.date.addingTimeInterval(-60) ? "just now"
+                    : RelativeDateTimeFormatter().localizedString(for: date, relativeTo: context.date)))
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 }
@@ -95,10 +119,21 @@ private struct StorageBar: View {
         let other = max(total - free - Double(cats.reduce(0) { $0 + $1.sizeBytes }), 0)
         VStack(alignment: .leading, spacing: 6) {
             GeometryReader { g in
+                // Ticked part of each category solid, the rest faded; the line marks where free space ends after cleaning.
                 HStack(spacing: 0) {
-                    ForEach(cats) { c in c.id.color.frame(width: g.size.width * Double(c.sizeBytes) / total) }
+                    ForEach(cats) { c in
+                        let on = Double(c.items.filter { model.selected.contains($0.id) }.reduce(0) { $0 + $1.sizeBytes })
+                        c.id.color.frame(width: g.size.width * on / total)
+                        c.id.color.opacity(0.35).frame(width: g.size.width * (Double(c.sizeBytes) - on) / total)
+                    }
                     Color.gray.frame(width: g.size.width * other / total)
                     Color.gray.opacity(0.2)
+                }
+                .overlay(alignment: .leading) {
+                    if model.selectedBytes > 0 {
+                        Rectangle().fill(.primary).frame(width: 2)
+                            .offset(x: g.size.width * max(total - free - Double(model.selectedBytes), 0) / total - 1)
+                    }
                 }
             }
             .frame(height: 12)
@@ -178,6 +213,11 @@ private struct ItemRow: View {
             .toggleStyle(.checkbox)
             Spacer()
             Text(bytes(item.sizeBytes)).monospacedDigit().foregroundStyle(.secondary)
+        }
+        .contextMenu {
+            if case .trash(let url) = item.method {
+                Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+            }
         }
     }
 

@@ -29,6 +29,11 @@ let isBundled = Bundle.main.bundleIdentifier != nil
     var isCleaning = false
     /// Shown until the owner dismisses it, even across popover reopenings.
     var lastReport: CleanReport?
+    /// Result of "Delete from Trash now" for `lastReport`.
+    var trashPurge: (bytes: Int64, failures: [String])?
+    var isPurging = false
+    /// When the last full scan finished (kept across launches).
+    var lastScanned: Date? = UserDefaults.standard.object(forKey: "lastScanned") as? Date
 
     @ObservationIgnored private(set) var isOpen = false
     @ObservationIgnored private var touched: Set<String> = []
@@ -60,6 +65,7 @@ let isBundled = Bundle.main.bundleIdentifier != nil
         self.results = results
         self.freeBytes = freeBytes
         self.totalBytes = totalBytes
+        lastScanned = Date().addingTimeInterval(-120)
         selected = Set(results.flatMap(\.items)
             .filter { defaultTicked($0, now: Date(), cutoffDays: demoSettings.cutoffDays) }.map(\.id))
     }
@@ -115,7 +121,11 @@ let isBundled = Bundle.main.bundleIdentifier != nil
                     }
                 }
             }
-            if !Task.isCancelled { isScanning = false }
+            if !Task.isCancelled {
+                isScanning = false
+                lastScanned = Date()
+                if !isDemo { UserDefaults.standard.set(lastScanned, forKey: "lastScanned") }
+            }
         }
     }
 
@@ -208,6 +218,7 @@ let isBundled = Bundle.main.bundleIdentifier != nil
         guard !isCleaning else { return }
         isCleaning = true
         lastReport = nil
+        trashPurge = nil
         cleanProgress = (0, items.count)
         let cleaner = Cleaner(removalGuard: RemovalGuard(locations: Locations(home: home), scanRoots: settings.scanRoots),
                               runner: ProcessRunner(), home: home)
@@ -221,6 +232,18 @@ let isBundled = Bundle.main.bundleIdentifier != nil
             isCleaning = false
             refreshFreeSpace()
             if isOpen { rescan() }  // no background scanning (spec section 4)
+        }
+    }
+
+    /// Permanently deletes exactly what the last clean moved to the Trash (owner confirmed in the sheet).
+    func deleteTrashed() {
+        guard let items = lastReport?.trashedItems, !items.isEmpty, trashPurge == nil, !isPurging else { return }
+        isPurging = true
+        Task {
+            let result = await Task.detached { deleteFromTrash(items) }.value
+            trashPurge = result
+            isPurging = false
+            refreshFreeSpace()
         }
     }
 }

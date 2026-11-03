@@ -35,10 +35,15 @@ Built for small-disk Macs (it started on a 256 GB MacBook Air) where clearing ca
 
 ## Screenshots
 
-| Scan results | Clean summary | Settings |
-|---|---|---|
-| <img src="docs/assets/popover.png" alt="Popover with categories" width="260"> | <img src="docs/assets/clean-summary.png" alt="Clean summary before confirming" width="260"> | <img src="docs/assets/settings.png" alt="Settings window" width="260"> |
-| Storage bar, categories and sizes. Open a row to tick single items. | Everything that will happen, before anything happens. | Recently-used window, low-space alert, project folders. |
+| Scan results | Clean summary |
+|---|---|
+| <img src="docs/assets/popover.png" alt="Popover with categories" width="300"> | <img src="docs/assets/clean-summary.png" alt="Clean summary before confirming" width="300"> |
+| How much is ready to clean, and where free space will end up (the white line). Right-click an item to reveal it in Finder. | Everything that will happen, before anything happens. |
+
+| After cleaning | Settings |
+|---|---|
+| <img src="docs/assets/clean-done.png" alt="Result with Delete from Trash now" width="300"> | <img src="docs/assets/settings.png" alt="Settings window" width="300"> |
+| Get the space back straight away: delete only what DevBroom just moved from the Trash. | Recently-used window, low-space alert, project folders. |
 
 ## What it cleans
 
@@ -82,7 +87,8 @@ Anything moved to the Trash can be put back until you empty the Trash. The few p
 1. **Click the menu bar icon.** The last results appear at once, then each row refreshes as the new scan finishes.
 2. **Pick what to clear.** Old, rebuildable items are already ticked. Open any row to tick or untick single items.
 3. **Press Clean.** A summary lists what moves to the Trash and what gets deleted permanently, with sizes.
-4. **Confirm.** DevBroom works through the list, skips anything that fails, and tells you how much space came back.
+4. **Confirm.** DevBroom works through the list, skips anything that fails, and tells you what it moved.
+5. **Get the space back.** Press **Delete from Trash now** to permanently delete only what DevBroom just moved (it asks once more). Anything else in your Trash is left alone. Or keep it in the Trash and decide later.
 
 Closing the panel stops the scan straight away. Rows that didn't finish keep their old numbers and say "not updated".
 
@@ -139,7 +145,7 @@ Open the panel and click **Settings**.
 ## FAQ
 
 **I cleaned, but my free space didn't change.**
-Items moved to the Trash still take space until you empty the Trash. Docker can also take a few minutes to hand space back after a prune.
+Items moved to the Trash still take space until you empty the Trash. After a clean, press **Delete from Trash now** to delete just those items. Docker can also take a few minutes to hand space back after a prune.
 
 **Why are some items unticked?**
 They were used recently, they need a re-download, or their app is running. You can still tick them yourself.

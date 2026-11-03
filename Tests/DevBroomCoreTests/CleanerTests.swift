@@ -19,11 +19,13 @@ fileprivate final class TrashSpy: @unchecked Sendable {
     var failFirst = false
     let bin: URL
     init(bin: URL) { self.bin = bin }
-    func trash(_ u: URL) throws {
+    func trash(_ u: URL) throws -> URL? {
         let n = lock.withLock { count += 1; return count }
         if failFirst && n == 1 { throw CocoaError(.fileWriteNoPermission) }
         try FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
-        try FileManager.default.moveItem(at: u, to: bin.appending(path: UUID().uuidString))
+        let to = bin.appending(path: UUID().uuidString)
+        try FileManager.default.moveItem(at: u, to: to)
+        return to
     }
 }
 
@@ -60,6 +62,25 @@ private func cleanItem(_ id: String, _ method: RemovalMethod, bytes: Int64 = 100
         let r = await real.clean([cleanItem("a", .trash(d))]) { _, _ in }
         #expect(r.outcomes["a"] == .trashed(bytes: 100))
         #expect(!FileManager.default.fileExists(atPath: d.path))
+    }
+
+    @Test func deleteFromTrashRemovesOnlyWhatWasTrashed() async throws {
+        let a = try h.make("Library/Caches/com.a/f").deletingLastPathComponent()
+        let other = try h.make(".Trash/keep-me")  // something the owner trashed earlier
+        let r = await cleaner.clean([cleanItem("a", .trash(a), bytes: 50)]) { _, _ in }
+        #expect(r.trashedItems.count == 1)
+        let purge = deleteFromTrash(r.trashedItems)
+        #expect(purge.bytes == 50 && purge.failures.isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: r.trashedItems[0].url.path))
+        #expect(FileManager.default.fileExists(atPath: other.path))
+        #expect(deleteFromTrash(r.trashedItems).bytes == 0)  // already gone: nothing counted, no failure
+    }
+
+    @Test func deleteFromTrashRefusesPathsOutsideTheTrash() throws {
+        let f = try h.make("Library/Caches/com.b/f")
+        let purge = deleteFromTrash([(f, 10)])
+        #expect(purge.bytes == 0 && purge.failures.count == 1)
+        #expect(FileManager.default.fileExists(atPath: f.path))
     }
 
     @Test func trashesPathWithSpaces() async throws {
