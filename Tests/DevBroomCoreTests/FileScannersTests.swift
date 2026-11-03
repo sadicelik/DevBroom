@@ -43,8 +43,12 @@ final class FileScannersTests: XCTestCase {
 
     func testNodeModulesRules() throws {
         let h = try TempHome()
+        try h.make("code/a/package.json")
+        try h.make("code/a/node_modules/x/package.json")
         try h.make("code/a/node_modules/x/node_modules/y")
+        try h.make(".vscode/ext/package.json")
         try h.make(".vscode/ext/node_modules/z")
+        try h.make("Library/p/package.json")
         try h.make("Library/p/node_modules/z")
         try h.make("code/b/src/f")
         let r = try scanners(h).nodeModules()
@@ -59,6 +63,35 @@ final class FileScannersTests: XCTestCase {
         try h.make("code/a/node_modules/x", modified: ago(100))
         let r = try scanners(h).nodeModules()
         XCTAssertTrue(r.items[0].tags.contains(.recentlyUsed))
+    }
+
+    func testNodeModulesSkipsAppBundlesAndNonProjects() throws {
+        let h = try TempHome()
+        try h.make("code/Foo.app/Contents/Resources/app/package.json")
+        try h.make("code/Foo.app/Contents/Resources/app/node_modules/x")
+        try h.make("n/lib/node_modules/npm/f")
+        try h.make("code/a/package.json")
+        try h.make("code/a/node_modules/x")
+        let r = try scanners(h).nodeModules()
+        XCTAssertEqual(r.items.map(\.name), ["a"])
+    }
+
+    func testNodeModulesOverlappingRootsNoDuplicates() throws {
+        let h = try TempHome()
+        try h.make("code/a/package.json")
+        try h.make("code/a/node_modules/x")
+        let s = FileScanners(locations: Locations(home: h.url), scanRoots: [h.url, h.url.appending(path: "code")],
+                             now: now, cutoffDays: 14, runningBundleIDs: [])
+        XCTAssertEqual(try s.nodeModules().items.count, 1)
+    }
+
+    func testNodeModulesUnderHiddenRootNotListed() throws {
+        let h = try TempHome()
+        try h.make(".hidden/code/a/package.json")
+        try h.make(".hidden/code/a/node_modules/x")
+        let s = FileScanners(locations: Locations(home: h.url), scanRoots: [h.url.appending(path: ".hidden/code")],
+                             now: now, cutoffDays: 14, runningBundleIDs: [])
+        XCTAssertTrue(try s.nodeModules().items.isEmpty)
     }
 
     func testDeviceSupportHandlesSpaces() throws {

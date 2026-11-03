@@ -7,10 +7,20 @@ public struct FileScanners: Sendable {
     let now: Date
     let cutoffDays: Int
     let runningBundleIDs: Set<String>
+    let removalGuard: RemovalGuard
 
     public init(locations: Locations, scanRoots: [URL], now: Date, cutoffDays: Int, runningBundleIDs: Set<String>) {
         self.locations = locations; self.scanRoots = scanRoots; self.now = now
         self.cutoffDays = cutoffDays; self.runningBundleIDs = runningBundleIDs
+        removalGuard = RemovalGuard(locations: locations, scanRoots: scanRoots)
+    }
+
+    /// Lists only what the Cleaner's guard would allow, so scanner and guard never disagree.
+    private func result(_ id: CategoryID, _ items: [CleanItem]) -> CategoryResult {
+        CategoryResult(id: id, items: items.filter {
+            if case .trash(let u) = $0.method { return removalGuard.allows(u) }
+            return true
+        }, status: .fresh)
     }
 
     public func derivedData() throws -> CategoryResult {
@@ -19,14 +29,14 @@ public struct FileScanners: Sendable {
             if let i = name.lastIndex(of: "-") { name = String(name[..<i]) }
             return try makeItem(.derivedData, u, name: name, detail: "")
         }
-        return CategoryResult(id: .derivedData, items: items, status: .fresh)
+        return result(.derivedData, items)
     }
 
     public func packageCaches() throws -> CategoryResult {
         let items = try locations.packageCaches.filter { exists($0.url) }.map {
             try makeItem(.packageCaches, $0.url, name: $0.tool, detail: abbreviate($0.url.path))
         }
-        return CategoryResult(id: .packageCaches, items: items, status: .fresh)
+        return result(.packageCaches, items)
     }
 
     public func appCaches() throws -> CategoryResult {
@@ -38,7 +48,7 @@ public struct FileScanners: Sendable {
             if runningBundleIDs.contains(id) { it.tags.insert(.appRunning) }
             return it
         }
-        return CategoryResult(id: .appCaches, items: items, status: .fresh)
+        return result(.appCaches, items)
     }
 
     public func deviceSupport() throws -> CategoryResult {
@@ -48,22 +58,23 @@ public struct FileScanners: Sendable {
                 items.append(try makeItem(.deviceSupport, u, name: u.lastPathComponent, detail: folder.lastPathComponent))
             }
         }
-        return CategoryResult(id: .deviceSupport, items: items, status: .fresh)
+        return result(.deviceSupport, items)
     }
 
     public func wallpaper() throws -> CategoryResult {
         let items = try children(locations.wallpaperVideos).map {
             try makeItem(.wallpaper, $0, name: $0.lastPathComponent, detail: "")
         }
-        return CategoryResult(id: .wallpaper, items: items, status: .fresh)
+        return result(.wallpaper, items)
     }
 
     public func nodeModules() throws -> CategoryResult {
         let library = locations.home.appendingPathComponent("Library").standardizedFileURL.path
         var items: [CleanItem] = []
+        var seen: Set<String> = []
         for root in scanRoots {
             guard let en = FileManager.default.enumerator(
-                at: root, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey], options: [],
+                at: root, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey], options: [.skipsPackageDescendants],
                 errorHandler: { _, _ in true }) else { continue }
             var n = 0
             for case let u as URL in en {
@@ -76,6 +87,9 @@ public struct FileScanners: Sendable {
                 if name == "node_modules" {
                     en.skipDescendants()
                     let parent = u.deletingLastPathComponent()
+                    // Only project folders; skips global installs like ~/n/lib/node_modules.
+                    guard exists(parent.appendingPathComponent("package.json")),
+                          seen.insert(u.standardizedFileURL.path).inserted else { continue }
                     let lastUsed = try folderStats(parent, skipping: ["node_modules"]).newestModification
                     var it = try makeItem(.nodeModules, u, name: parent.lastPathComponent, detail: abbreviate(parent.path))
                     it.lastUsed = lastUsed
@@ -85,7 +99,7 @@ public struct FileScanners: Sendable {
                 }
             }
         }
-        return CategoryResult(id: .nodeModules, items: items, status: .fresh)
+        return result(.nodeModules, items)
     }
 
     // MARK: helpers

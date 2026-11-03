@@ -11,6 +11,8 @@ public struct RemovalGuard: Sendable {
         let scanRoots: [[String]]
 
         func allows(_ p: [String]) -> Bool {
+            // Never inside an app bundle (e.g. VS Code's bundled node_modules).
+            if p.contains(where: { $0.lowercased().hasSuffix(".app") }) { return false }
             if exact.contains(p) { return true }
             if categoryFolders.contains(where: { p.count == $0.count + 1 && p.starts(with: $0) }) { return true }
             guard p.last == "node_modules",

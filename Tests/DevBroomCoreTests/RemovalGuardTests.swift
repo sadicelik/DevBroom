@@ -37,6 +37,11 @@ struct RemovalGuardTests {
         #expect(g2.allows(u("code/x/node_modules")))
     }
 
+    @Test func appBundleComponentRefused() {
+        #expect(!g.allows(u("code/Foo.app/Contents/Resources/app/node_modules")))
+        #expect(!g.allows(u("code/Bar.APP/x/node_modules")))
+    }
+
     @Test func symlinkRefused() throws {
         try h.dir("Documents")
         try h.dir("Library/Caches")
