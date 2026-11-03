@@ -26,7 +26,7 @@ struct PopoverView: View {
     /// Snapshot taken when the summary opens (spec section 4 rule 4): exactly these items are shown and cleaned.
     @State private var cleanSheet: (items: [CleanItem], recent: [String])?
     /// Height of the category list's content, so the panel fits it (up to a maximum) instead of a fixed size.
-    @State private var listHeight: CGFloat = 0
+    @State private var listHeight: CGFloat = 300
 
     var body: some View {
         // VStack, not Group: Group would forward onAppear/onDisappear to each swapped child.
@@ -57,7 +57,7 @@ struct PopoverView: View {
                 }
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listHeight = $0 }
             }
-            .frame(height: min(max(listHeight, 40), 420))
+            .frame(height: min(listHeight, 420))
             Divider()
             HStack {
                 Button("Clean \(bytes(model.selectedBytes))") {
@@ -96,13 +96,19 @@ struct PopoverView: View {
         }
     }
 
+    private static let ago: RelativeDateTimeFormatter = {
+        let f = RelativeDateTimeFormatter()
+        f.unitsStyle = .abbreviated
+        return f
+    }()
+
     @ViewBuilder private var scannedText: some View {
         if model.isScanning {
             Text("Scanning…").foregroundStyle(.secondary)
         } else if let date = model.lastScanned {
             TimelineView(.periodic(from: .now, by: 60)) { context in
                 Text("Scanned " + (date > context.date.addingTimeInterval(-60) ? "just now"
-                    : RelativeDateTimeFormatter().localizedString(for: date, relativeTo: context.date)))
+                    : Self.ago.localizedString(for: date, relativeTo: context.date)))
                     .foregroundStyle(.secondary)
             }
         }
@@ -214,6 +220,7 @@ private struct ItemRow: View {
             Spacer()
             Text(bytes(item.sizeBytes)).monospacedDigit().foregroundStyle(.secondary)
         }
+        .contentShape(Rectangle())
         .contextMenu {
             if case .trash(let url) = item.method {
                 Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }

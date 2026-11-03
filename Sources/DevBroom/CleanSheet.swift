@@ -18,7 +18,9 @@ struct CleanSheet: View {
             if let report = model.lastReport {
                 result(report)
                 purge(report)
-                Button("Done") { model.lastReport = nil; model.trashPurge = nil; dismiss() }.keyboardShortcut(.defaultAction)
+                Button("Done") { model.lastReport = nil; model.trashPurge = nil; dismiss() }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(model.isPurging)
             } else if model.isCleaning {
                 let p = model.cleanProgress ?? (0, items.count)
                 ProgressView("Cleaning \(p.done) of \(p.total)", value: Double(p.done), total: Double(max(p.total, 1)))
@@ -80,7 +82,8 @@ struct CleanSheet: View {
     @ViewBuilder private func purge(_ r: CleanReport) -> some View {
         let size = r.trashedItems.reduce(0) { $0 + $1.bytes }
         if let p = model.trashPurge {
-            Text("Deleted \(bytes(p.bytes)) from the Trash").foregroundStyle(.green)
+            if p.bytes > 0 { Text("Deleted \(bytes(p.bytes)) from the Trash").foregroundStyle(.green) }
+            else if p.failures.isEmpty { Text("Already gone from the Trash").foregroundStyle(.secondary) }
             ForEach(p.failures, id: \.self) { Text($0).font(.caption).foregroundStyle(.red) }
         } else if !r.trashedItems.isEmpty {
             if confirmPurge {
@@ -93,6 +96,10 @@ struct CleanSheet: View {
                 }
             } else {
                 Button("Delete \(bytes(size)) from Trash now") { confirmPurge = true }
+            }
+            if size < r.trashedBytes {
+                Text("Some items went to a Trash DevBroom can't reach; empty it in Finder.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
         }
     }

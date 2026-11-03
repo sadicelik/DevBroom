@@ -5,27 +5,63 @@ public enum ItemOutcome: Equatable, Sendable {
 }
 
 public struct CleanReport: Sendable {
+    /// Ties a "Delete from Trash now" result to the clean it belongs to.
+    public let id = UUID()
     public var outcomes: [String: ItemOutcome] = [:]
     public var trashedBytes: Int64 = 0
     public var deletedBytes: Int64 = 0
     public var failures: [(name: String, reason: String)] = []
     /// Where each trashed item ended up, so "Delete from Trash now" removes exactly these and nothing else.
-    public var trashedItems: [(url: URL, bytes: Int64)] = []
+    public var trashedItems: [TrashedItem] = []
     public init() {}
 }
 
-/// Permanently deletes items DevBroom itself moved to the Trash. Anything not directly inside a Trash folder
-/// (`~/.Trash/x` or `/Volumes/V/.Trashes/<uid>/x`) is refused.
-public func deleteFromTrash(_ items: [(url: URL, bytes: Int64)]) -> (bytes: Int64, failures: [String]) {
+/// An item DevBroom moved to the Trash, with the file identity it had when it landed there.
+public struct TrashedItem: Sendable {
+    public let url: URL
+    public let bytes: Int64
+    public let identity: FileIdentity?
+    /// Records the identity the item has right now (call just after it lands in the Trash).
+    public init(url: URL, bytes: Int64) {
+        self.url = url; self.bytes = bytes; identity = FileIdentity(url)
+    }
+}
+
+/// Device + inode + creation time: tells "the item DevBroom trashed" apart from a later item at the same path.
+public struct FileIdentity: Sendable, Equatable {
+    let device: Int64, inode: UInt64, birth: Double
+    public init?(_ url: URL) {
+        var st = stat()
+        guard lstat(url.path, &st) == 0 else { return nil }
+        device = Int64(st.st_dev); inode = UInt64(st.st_ino)
+        birth = Double(st.st_birthtimespec.tv_sec) + Double(st.st_birthtimespec.tv_nsec) / 1e9
+    }
+}
+
+/// True if `folder` is this user's Trash for the volume `item` is on (`~/.Trash` or `/Volumes/V/.Trashes/<uid>`).
+public func isUserTrash(_ folder: URL, for item: URL) -> Bool {
+    guard let trash = try? FileManager.default.url(for: .trashDirectory, in: .userDomainMask,
+                                                    appropriateFor: item, create: false) else { return false }
+    return folder.resolvingSymlinksInPath().standardizedFileURL.path
+        == trash.resolvingSymlinksInPath().standardizedFileURL.path
+}
+
+/// Permanently deletes items DevBroom itself moved to the Trash. Refuses anything not directly inside the user's
+/// Trash, and anything whose identity changed since it was trashed (put back, emptied, replaced by another item).
+public func deleteFromTrash(_ items: [TrashedItem],
+                            isTrash: (URL, URL) -> Bool = isUserTrash) -> (bytes: Int64, failures: [String]) {
     var bytes: Int64 = 0, failures: [String] = []
-    for (url, size) in items {
-        let parent = url.standardizedFileURL.deletingLastPathComponent()
-        guard parent.lastPathComponent == ".Trash" || parent.deletingLastPathComponent().lastPathComponent == ".Trashes" else {
-            failures.append("\(url.lastPathComponent): not in the Trash"); continue
+    for item in items {
+        let url = item.url, name = url.lastPathComponent
+        guard isTrash(url.standardizedFileURL.deletingLastPathComponent(), url) else {
+            failures.append("\(name): not in the Trash"); continue
         }
-        guard FileManager.default.fileExists(atPath: url.path) else { continue }  // already emptied
-        do { try FileManager.default.removeItem(at: url); bytes += size }
-        catch { failures.append("\(url.lastPathComponent): \(error.localizedDescription)") }
+        guard let now = FileIdentity(url) else { continue }  // already emptied or put back
+        guard let then = item.identity, then == now else {
+            failures.append("\(name): changed since cleaning, left in the Trash"); continue
+        }
+        do { try FileManager.default.removeItem(at: url); bytes += item.bytes }
+        catch { failures.append("\(name): \(error.localizedDescription)") }
     }
     return (bytes, failures)
 }
@@ -52,7 +88,7 @@ public struct Cleaner: Sendable {
         for (i, item) in items.enumerated() {
             let (outcome, landed) = await remove(item)
             report.outcomes[item.id] = outcome
-            if let landed { report.trashedItems.append((landed, item.sizeBytes)) }
+            if let landed { report.trashedItems.append(TrashedItem(url: landed, bytes: item.sizeBytes)) }
             switch outcome {
             case .trashed(let b): report.trashedBytes += b
             case .deleted(let b): report.deletedBytes += b

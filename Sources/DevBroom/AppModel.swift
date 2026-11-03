@@ -215,7 +215,7 @@ let isBundled = Bundle.main.bundleIdentifier != nil
 
     /// Runs in the model, not the view, so closing the popover neither loses the result nor allows a second clean.
     func clean(_ items: [CleanItem]) {
-        guard !isCleaning else { return }
+        guard !isCleaning, !isPurging else { return }
         isCleaning = true
         lastReport = nil
         trashPurge = nil
@@ -237,11 +237,12 @@ let isBundled = Bundle.main.bundleIdentifier != nil
 
     /// Permanently deletes exactly what the last clean moved to the Trash (owner confirmed in the sheet).
     func deleteTrashed() {
-        guard let items = lastReport?.trashedItems, !items.isEmpty, trashPurge == nil, !isPurging else { return }
+        guard let report = lastReport, !report.trashedItems.isEmpty, trashPurge == nil, !isPurging else { return }
         isPurging = true
+        let items = report.trashedItems
         Task {
             let result = await Task.detached { deleteFromTrash(items) }.value
-            trashPurge = result
+            if lastReport?.id == report.id { trashPurge = result }  // never show it under a newer clean
             isPurging = false
             refreshFreeSpace()
         }

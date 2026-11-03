@@ -64,23 +64,38 @@ private func cleanItem(_ id: String, _ method: RemovalMethod, bytes: Int64 = 100
         #expect(!FileManager.default.fileExists(atPath: d.path))
     }
 
+    private var isBin: (URL, URL) -> Bool { { [bin = spy.bin] folder, _ in folder.standardizedFileURL.path == bin.standardizedFileURL.path } }
+
     @Test func deleteFromTrashRemovesOnlyWhatWasTrashed() async throws {
         let a = try h.make("Library/Caches/com.a/f").deletingLastPathComponent()
         let other = try h.make(".Trash/keep-me")  // something the owner trashed earlier
         let r = await cleaner.clean([cleanItem("a", .trash(a), bytes: 50)]) { _, _ in }
         #expect(r.trashedItems.count == 1)
-        let purge = deleteFromTrash(r.trashedItems)
+        let purge = deleteFromTrash(r.trashedItems, isTrash: isBin)
         #expect(purge.bytes == 50 && purge.failures.isEmpty)
         #expect(!FileManager.default.fileExists(atPath: r.trashedItems[0].url.path))
         #expect(FileManager.default.fileExists(atPath: other.path))
-        #expect(deleteFromTrash(r.trashedItems).bytes == 0)  // already gone: nothing counted, no failure
+        #expect(deleteFromTrash(r.trashedItems, isTrash: isBin).bytes == 0)  // already gone: nothing counted, no failure
+    }
+
+    /// Put back, then another item lands at the same Trash path: the new item must survive.
+    @Test func deleteFromTrashSkipsReplacedItem() async throws {
+        let a = try h.make("Library/Caches/com.a/f").deletingLastPathComponent()
+        let r = await cleaner.clean([cleanItem("a", .trash(a), bytes: 50)]) { _, _ in }
+        let landed = r.trashedItems[0].url
+        try FileManager.default.moveItem(at: landed, to: a)                      // "Put Back"
+        try FileManager.default.createDirectory(at: landed, withIntermediateDirectories: true)  // owner's own item
+        let purge = deleteFromTrash(r.trashedItems, isTrash: isBin)
+        #expect(purge.bytes == 0 && purge.failures.count == 1)
+        #expect(FileManager.default.fileExists(atPath: landed.path))
     }
 
     @Test func deleteFromTrashRefusesPathsOutsideTheTrash() throws {
         let f = try h.make("Library/Caches/com.b/f")
-        let purge = deleteFromTrash([(f, 10)])
-        #expect(purge.bytes == 0 && purge.failures.count == 1)
-        #expect(FileManager.default.fileExists(atPath: f.path))
+        let fake = try h.make("proj/.Trash/src")  // a folder merely named .Trash
+        let purge = deleteFromTrash([TrashedItem(url: f, bytes: 10), TrashedItem(url: fake, bytes: 10)])
+        #expect(purge.bytes == 0 && purge.failures.count == 2)
+        #expect(FileManager.default.fileExists(atPath: f.path) && FileManager.default.fileExists(atPath: fake.path))
     }
 
     @Test func trashesPathWithSpaces() async throws {

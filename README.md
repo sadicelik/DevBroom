@@ -38,7 +38,7 @@ Built for small-disk Macs (it started on a 256 GB MacBook Air) where clearing ca
 | Scan results | Clean summary |
 |---|---|
 | <img src="docs/assets/popover.png" alt="Popover with categories" width="300"> | <img src="docs/assets/clean-summary.png" alt="Clean summary before confirming" width="300"> |
-| How much is ready to clean, and where free space will end up (the white line). Right-click an item to reveal it in Finder. | Everything that will happen, before anything happens. |
+| How much is ready to clean, and where free space will end up (the thin line on the bar). Right-click an item to reveal it in Finder. | Everything that will happen, before anything happens. |
 
 | After cleaning | Settings |
 |---|---|
