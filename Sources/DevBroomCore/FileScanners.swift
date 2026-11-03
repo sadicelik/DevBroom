@@ -79,6 +79,7 @@ public struct FileScanners: Sendable {
                     let lastUsed = try folderStats(parent, skipping: ["node_modules"]).newestModification
                     var it = try makeItem(.nodeModules, u, name: parent.lastPathComponent, detail: abbreviate(parent.path))
                     it.lastUsed = lastUsed
+                    it.tags.remove(.recentlyUsed)
                     if isRecentlyUsed(lastUsed, now: now, cutoffDays: cutoffDays) { it.tags.insert(.recentlyUsed) }
                     items.append(it)
                 }
@@ -93,7 +94,8 @@ public struct FileScanners: Sendable {
 
     private func children(_ dir: URL) throws -> [URL] {
         guard exists(dir) else { return [] }
-        return (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
+        let all = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.isSymbolicLinkKey])) ?? []
+        return all.filter { (try? $0.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) != true }
     }
 
     private func abbreviate(_ path: String) -> String {

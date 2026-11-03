@@ -76,4 +76,25 @@ final class FileScannersTests: XCTestCase {
             XCTAssertTrue(r.items.isEmpty)
         }
     }
+
+    func testNodeModulesFreshInstallOldProjectNotRecent() throws {
+        let h = try TempHome()
+        try h.make("code/a/package.json", modified: ago(100))
+        try h.make("code/a/node_modules/x", modified: ago(1))
+        let r = try scanners(h).nodeModules()
+        XCTAssertEqual(r.items.count, 1)
+        XCTAssertFalse(r.items[0].tags.contains(.recentlyUsed))
+    }
+
+    func testSymlinkRootsNeverFollowed() throws {
+        let h = try TempHome()
+        let target = try h.dir("target")
+        try h.make("target/big", bytes: 1_000_000)
+        try h.dir("Library/Caches")
+        let link = h.url.appending(path: "Library/Caches/link")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
+        try h.make("Library/Caches/real/f")
+        XCTAssertEqual(try folderStats(link).allocatedBytes, 0)
+        XCTAssertEqual(try scanners(h).appCaches().items.map(\.detail), ["real"])
+    }
 }

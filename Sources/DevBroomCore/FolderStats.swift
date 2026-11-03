@@ -15,8 +15,9 @@ public func folderStats(_ url: URL, skipping: Set<String> = []) throws -> Folder
         stats.allocatedBytes += Int64(v.totalFileAllocatedSize ?? 0)
         if let m = v.contentModificationDate, m > (stats.newestModification ?? .distantPast) { stats.newestModification = m }
     }
-    // A folder's own mtime is not usage; only count the root when it is a file.
-    if let v = try? url.resourceValues(forKeys: Set(statKeys.dropLast() + [.isDirectoryKey])), v.isDirectory != true { add(v) }
+    // Symlink roots are never followed or counted. A folder's own mtime is not usage; only count the root when it is a file.
+    guard let rv = try? url.resourceValues(forKeys: Set(statKeys + [.isDirectoryKey])), rv.isSymbolicLink != true else { return stats }
+    if rv.isDirectory != true { add(rv) }
     guard let en = FileManager.default.enumerator(at: url, includingPropertiesForKeys: statKeys, options: [],
                                                   errorHandler: { _, _ in true }) else { return stats }
     var n = 0
