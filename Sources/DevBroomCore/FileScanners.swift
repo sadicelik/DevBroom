@@ -87,16 +87,18 @@ public struct FileScanners: Sendable {
                       v.isDirectory == true, v.isSymbolicLink != true else { continue }
                 let name = u.lastPathComponent
                 if projectBuildFolderNames.contains(name), let eco = buildEcosystem(of: u) {
-                    if gitTracksFiles(in: u) { en.skipDescendants(); continue }
-                    en.skipDescendants()
-                    guard seen.insert(u.standardizedFileURL.path).inserted else { continue }
-                    let marker = u.deletingLastPathComponent()
-                    let project = projectFolder(forMarkerFolder: marker, scanRoot: root)
-                    var it = try makeItem(.projectBuilds, u, name: "\(project.lastPathComponent) · \(eco.rawValue) \(name)",
-                                          detail: abbreviate(marker.path))
-                    try setUsage(&it)
-                    builds.append(it)
-                    continue
+                    // Git-tracked candidates are not listed but are walked into like any other folder (spec 4.2).
+                    if !gitTracksFiles(in: u) {
+                        en.skipDescendants()
+                        guard seen.insert(u.standardizedFileURL.path).inserted else { continue }
+                        let marker = u.deletingLastPathComponent()
+                        let project = projectFolder(forMarkerFolder: marker, scanRoot: root)
+                        var it = try makeItem(.projectBuilds, u, name: "\(project.lastPathComponent) · \(eco.rawValue) \(name)",
+                                              detail: abbreviate(marker.standardizedFileURL.path))
+                        try setUsage(&it)
+                        builds.append(it)
+                        continue
+                    }
                 }
                 if name == "hub" {
                     let hits = try children(u).filter { modelDisplayName($0.lastPathComponent) != nil }
@@ -113,7 +115,7 @@ public struct FileScanners: Sendable {
                     // Only project folders; skips global installs like ~/n/lib/node_modules.
                     guard exists(parent.appendingPathComponent("package.json")),
                           seen.insert(u.standardizedFileURL.path).inserted else { continue }
-                    var it = try makeItem(.nodeModules, u, name: parent.lastPathComponent, detail: abbreviate(parent.path))
+                    var it = try makeItem(.nodeModules, u, name: parent.lastPathComponent, detail: abbreviate(parent.standardizedFileURL.path))
                     try setUsage(&it)
                     nodes.append(it)
                 }
@@ -126,7 +128,7 @@ public struct FileScanners: Sendable {
     }
 
     private func modelItem(_ u: URL) throws -> CleanItem {
-        try makeItem(.aiModels, u, name: modelDisplayName(u.lastPathComponent) ?? u.lastPathComponent, detail: abbreviate(u.path))
+        try makeItem(.aiModels, u, name: modelDisplayName(u.lastPathComponent) ?? u.lastPathComponent, detail: abbreviate(u.standardizedFileURL.path))
     }
 
     /// lastUsed from the item's usage folder (see `usageFolder`), so scan and re-check share one rule.

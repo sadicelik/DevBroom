@@ -159,7 +159,7 @@ final class FileScannersTests: XCTestCase {
         XCTAssertEqual(result(r, .nodeModules).items.count, 1)
         let b = result(r, .projectBuilds).items
         XCTAssertEqual(b.map(\.name), ["p · HarmonyOS build"])
-        XCTAssertTrue(b.first?.detail.hasSuffix("/p/entry") == true)
+        XCTAssertEqual(b.first?.detail, "~/p/entry")
         XCTAssertFalse(b[0].tags.contains(.recentlyUsed))
     }
 
@@ -210,5 +210,29 @@ final class FileScannersTests: XCTestCase {
         try h.make(".hidden/q/build/x")
         let b = result(try scanners(h).projects(), .projectBuilds).items
         XCTAssertEqual(b.map(\.name), ["p · Python .venv"])
+    }
+
+    func testGitTrackedBuildIsWalkedInto() throws {
+        try XCTSkipUnless(TempHome.gitAvailable)
+        let h = try TempHome()
+        try h.make("p/build.gradle")
+        try h.make("p/build/q/Cargo.toml")
+        let p = try h.dir("p")
+        try h.git(p, "init"); try h.git(p, "add", "build.gradle", "build/q/Cargo.toml"); try h.git(p, "commit", "-m", "x")
+        try h.make("p/build/q/target/x")  // untracked, added after the commit
+        let b = result(try scanners(h).projects(), .projectBuilds).items
+        XCTAssertEqual(b.count, 1)
+        XCTAssertTrue(b[0].id.hasSuffix("p/build/q/target"))
+    }
+
+    func testBuildFreshOutputOldProjectNotRecent() throws {
+        let h = try TempHome()
+        try repo(h, "p")
+        try h.make("p/entry/hvigorfile.ts", modified: ago(100))
+        try h.make("p/src/a.ets", modified: ago(100))
+        try h.make("p/entry/build/x", modified: ago(0))
+        let b = result(try scanners(h).projects(), .projectBuilds).items
+        XCTAssertEqual(b.count, 1)
+        XCTAssertFalse(b[0].tags.contains(.recentlyUsed))
     }
 }
