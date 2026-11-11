@@ -27,6 +27,7 @@ struct PopoverView: View {
     @State private var cleanSheet: (items: [CleanItem], recent: [String])?
     /// Height of the category list's content, so the panel fits it (up to a maximum) instead of a fixed size.
     @State private var listHeight: CGFloat = 300
+    @State private var preparing = false
 
     var body: some View {
         // VStack, not Group: Group would forward onAppear/onDisappear to each swapped child.
@@ -61,14 +62,17 @@ struct PopoverView: View {
             Divider()
             HStack {
                 Button("Clean \(bytes(model.selectedBytes))") {
+                    guard !preparing, cleanSheet == nil else { return }  // ⌘⏎ key repeat: prepare the summary once
+                    preparing = true
                     Task {
                         let recent = await model.recheckBeforeClean()
-                        if model.isOpen { cleanSheet = (model.selectedItems, recent) }  // closed meanwhile: no summary
+                        preparing = false
+                        if model.isOpen, cleanSheet == nil { cleanSheet = (model.selectedItems, recent) }  // closed meanwhile: no summary
                     }
                 }
                 .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.return, modifiers: .command)  // opens the summary; nothing is removed before Confirm
-                .disabled(model.selectedItems.isEmpty || model.isCleaning)
+                .disabled(model.selectedItems.isEmpty || model.isCleaning || preparing)
                 Spacer()
                 SettingsLink { Text("Settings") }
                     .simultaneousGesture(TapGesture().onEnded { NSApp.activate(ignoringOtherApps: true) })
@@ -204,6 +208,8 @@ private struct CategoryRow: View {
             }
             .opacity(category.status.isUnavailable ? 0.5 : 1)
         }
+        // A search typed while the row was large must not come back filtering later.
+        .onChange(of: category.items.count > 10) { _, searchable in if !searchable { query = "" } }
     }
 
     private var checkImage: String {

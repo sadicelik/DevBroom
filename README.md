@@ -93,7 +93,7 @@ Anything moved to the Trash can be put back until you empty the Trash. The few p
 Handy extras:
 
 - **Menu bar broom:** shows your free space and turns orange when it drops below your low-space limit.
-- **Item counts, sorting and search:** each row shows how many items it holds. Open a row to sort by size, last used or name, and to search rows with more than 10 items.
+- **Item counts, sorting and search:** each row shows how many items it holds. Open a row to sort by size, least recently used or name, and to search rows with more than 10 items.
 - **Hide from DevBroom:** right-click an item you always want to keep. It is never offered again until you unhide it in Settings.
 - **Keyboard:** ⌘R rescans, ⌘⏎ opens the Clean summary (nothing is removed before you confirm), Esc closes.
 

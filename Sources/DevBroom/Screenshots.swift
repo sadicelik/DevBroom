@@ -29,6 +29,7 @@ import SwiftUI
         model.lastReport = report
         render(CleanSheet(model: model, items: [], recentlyUnticked: [], dismiss: {}).padding(12),
                width: 424, to: dir.appending(path: "clean-done.png"))
+        defaults.removePersistentDomain(forName: "DevBroomScreenshots")  // exit(0) skips the defer
         exit(0)
     }
 
