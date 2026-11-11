@@ -31,8 +31,9 @@ public func buildEcosystem(of folder: URL, home: URL? = nil) -> Ecosystem? {
     case ".next", ".turbo", ".parcel-cache": return exists(parent, "package.json") ? .web : nil
     case ".gradle":
         // ~/.gradle is Gradle's own cache (listed under package caches), never a project folder.
-        let homePath = (home ?? FileManager.default.homeDirectoryForCurrentUser).standardizedFileURL.path
-        if parent.standardizedFileURL.path == homePath { return nil }
+        // Resolved on both sides, so a scan root that links to home can't present ~/.gradle under another name.
+        let homePath = (home ?? FileManager.default.homeDirectoryForCurrentUser).resolvingSymlinksInPath().path
+        if parent.resolvingSymlinksInPath().path == homePath { return nil }
         let markers = ["build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts"]
         return markers.contains { exists(parent, $0) } ? .gradle : nil
     default: return nil

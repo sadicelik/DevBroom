@@ -88,7 +88,9 @@ public struct Cleaner: Sendable {
         for (i, item) in items.enumerated() {
             let (outcome, landed, note) = await remove(item)
             report.outcomes[item.id] = outcome
-            for (i, u) in landed.enumerated() { report.trashedItems.append(TrashedItem(url: u, bytes: i == 0 ? item.sizeBytes : 0)) }
+            for (i, u) in landed.enumerated() {
+                if let u { report.trashedItems.append(TrashedItem(url: u, bytes: i == 0 ? item.sizeBytes : 0)) }
+            }
             if let note { report.failures.append((item.name, note)) }
             switch outcome {
             case .trashed(let b): report.trashedBytes += b
@@ -102,14 +104,14 @@ public struct Cleaner: Sendable {
     }
 
     /// The outcome, where trashed things ended up (the item first), and a note for a partial problem.
-    private func remove(_ item: CleanItem) async -> (ItemOutcome, [URL], String?) {
+    private func remove(_ item: CleanItem) async -> (ItemOutcome, [URL?], String?) {
         switch item.method {
         case .trash(let url):
             guard FileManager.default.fileExists(atPath: url.path) else { return (.alreadyGone, [], nil) }
             guard removalGuard.allows(url) else { return (.failed("Refused by safety guard"), [], nil) }
             let landed: URL?
             do { landed = try trash(url) } catch { return (.failed(error.localizedDescription), [], nil) }
-            var all = landed.map { [$0] } ?? []
+            var all: [URL?] = [landed]  // the item keeps slot 0 even when its landing place is unknown
             var note: String?
             // An Android emulator is `<name>.avd` plus `<name>.ini`; leaving the .ini would show a broken emulator.
             let avdFolder = Locations(home: home).androidAVDs.standardizedFileURL.path
@@ -117,7 +119,9 @@ public struct Cleaner: Sendable {
                 let ini = url.deletingPathExtension().appendingPathExtension("ini")
                 if FileManager.default.fileExists(atPath: ini.path) {
                     if removalGuard.allows(ini), let i = try? trash(ini) { all.append(i) }
-                    else { note = "\(ini.lastPathComponent) was left behind; delete the emulator in Android Studio" }
+                    if FileManager.default.fileExists(atPath: ini.path) {
+                        note = "\(ini.lastPathComponent) was left behind; delete the emulator in Android Studio"
+                    }
                 }
             }
             return (.trashed(bytes: item.sizeBytes), all, note)
