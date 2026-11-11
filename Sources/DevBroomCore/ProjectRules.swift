@@ -14,7 +14,7 @@ private func exists(_ url: URL, _ name: String) -> Bool {
 }
 
 /// Spec 4.2 marker table. Markers live in the folder's parent (for `.venv`: inside the folder).
-public func buildEcosystem(of folder: URL) -> Ecosystem? {
+public func buildEcosystem(of folder: URL, home: URL? = nil) -> Ecosystem? {
     let parent = folder.deletingLastPathComponent()
     switch folder.lastPathComponent {
     case "build":
@@ -31,7 +31,8 @@ public func buildEcosystem(of folder: URL) -> Ecosystem? {
     case ".next", ".turbo", ".parcel-cache": return exists(parent, "package.json") ? .web : nil
     case ".gradle":
         // ~/.gradle is Gradle's own cache (listed under package caches), never a project folder.
-        if parent.standardizedFileURL.path == FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL.path { return nil }
+        let homePath = (home ?? FileManager.default.homeDirectoryForCurrentUser).standardizedFileURL.path
+        if parent.standardizedFileURL.path == homePath { return nil }
         let markers = ["build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts"]
         return markers.contains { exists(parent, $0) } ? .gradle : nil
     default: return nil

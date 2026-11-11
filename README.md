@@ -74,7 +74,6 @@ Each row is one of two kinds:
 |---|---|---|
 | `node_modules` | Rebuilds | Trash |
 | Project builds: HarmonyOS `build`, `oh_modules`, `.hvigor` · Android/Gradle `build`, `.gradle` · Flutter `build` · Xcode `build` · SwiftPM `.build` · Rust `target` · Python `.venv` · Next.js `.next`, Turborepo `.turbo`, Parcel `.parcel-cache` | Rebuilds | Trash |
-| Android emulators (`~/.android/avd`) and SDK system images | Re-download | Trash |
 
 ### Caches and downloads
 
@@ -83,7 +82,8 @@ Each row is one of two kinds:
 | Package caches: npm, Yarn, pnpm, pip, uv, Homebrew, CocoaPods, Gradle, Gradle wrapper, Cargo, Go modules, Bun | Rebuilds | Trash |
 | Package caches: Maven, Dart/Flutter | Re-download | Trash |
 | App caches (`~/Library/Caches`) | Rebuilds | Trash |
-| AI model downloads: Hugging Face models and datasets, LM Studio models, Ollama models (all together) | Re-download | Trash |
+| AI model downloads: Hugging Face models and datasets, LM Studio models (one item per model), Ollama models (one item for all of them) | Re-download | Trash |
+| Android emulators (`~/.android/avd`) and SDK system images | Re-download | Trash |
 | Old VS Code and Cursor extension versions | Rebuilds | Trash |
 | Docker images, build cache and stopped containers | Re-download | `docker system prune -a -f`, permanent (volumes are never touched) |
 

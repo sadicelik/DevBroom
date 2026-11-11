@@ -169,6 +169,32 @@ final class FileScannersTests: XCTestCase {
         XCTAssertEqual(projects[1].items.map(\.name), ["s · SwiftPM .build"])
     }
 
+    func testV032ScannersSkipFilesHiddenEntriesAndFlagRunningEmulators() throws {
+        let h = try TempHome()
+        try h.make("Library/Developer/XCPGDevices/device_set.plist"); try h.make("Library/Developer/XCPGDevices/.DS_Store")
+        try h.make("Library/Developer/XCPGDevices/ABC/data")
+        try h.make(".lmstudio/models/pub/.DS_Store"); try h.make(".lmstudio/models/pub/m/w.gguf")
+        try h.make("Library/Android/sdk/system-images/.DS_Store")
+        try h.make(".android/avd/Run.avd/multiinstance.lock"); try h.make(".android/avd/Run.ini")
+        let sc = scanners(h)
+        XCTAssertEqual(try sc.xcodeExtras().items.map(\.name), ["SwiftUI previews: ABC"])
+        XCTAssertEqual(try sc.projects()[2].items.map(\.name), ["pub/m"])
+        let emus = try sc.androidEmulators().items
+        XCTAssertEqual(emus.map(\.name), ["Run"])
+        XCTAssertTrue(emus[0].tags.contains(.inUse))
+    }
+
+    func testWalkFindsWebAndGradleBuildFolders() throws {
+        let h = try TempHome()
+        try h.make("web/package.json"); try h.make("web/.next/x"); try h.make("web/.turbo/x"); try h.make("web/.parcel-cache/x")
+        try h.make("and/settings.gradle"); try h.make("and/.gradle/x")
+        try h.make("settings.gradle"); try h.make(".gradle/caches/x")  // Gradle's own cache in home: never a project build
+        try h.make("sw/Package.swift"); try h.make("sw/.build/checkouts/dep/Package.swift"); try h.make("sw/.build/checkouts/dep/.build/x")
+        let names = Set(try scanners(h).projects()[1].items.map(\.name))
+        XCTAssertEqual(names, ["web · JavaScript .next", "web · JavaScript .turbo", "web · JavaScript .parcel-cache",
+                               "and · Android .gradle", "sw · SwiftPM .build"])
+    }
+
     func testProjectWalkFindsBuildsAndKeepsNodeModules() throws {
         let h = try TempHome()
         try hmosProject(h)

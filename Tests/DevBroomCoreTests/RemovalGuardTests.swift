@@ -77,6 +77,14 @@ struct RemovalGuardTests {
         }
         try h.make(".android/avd/Pixel_8.ini")
         #expect(g.allows(u(".android/avd/Pixel_8.ini")))
+        // Hidden entries and anything that isn't an emulator folder or .ini file are refused.
+        try h.make(".android/avd/notes.txt"); try h.make(".android/avd/fake.avd"); try h.dir(".android/avd/odd.ini")
+        try h.make("Library/Developer/XCPGDevices/.DS_Store"); try h.make(".lmstudio/models/pub/.DS_Store")
+        try h.dir(".lmstudio/models/.hidden/m")
+        for p in [".android/avd/notes.txt", ".android/avd/fake.avd", ".android/avd/odd.ini",
+                  "Library/Developer/XCPGDevices/.DS_Store", ".lmstudio/models/pub/.DS_Store", ".lmstudio/models/.hidden/m"] {
+            #expect(!g.allows(u(p)), "\(p)")
+        }
         try h.dir(".ollama/models/blobs")
         #expect(g.allows(u(".ollama/models")))
         // Refused: the folders themselves, wrong depths, unmarked dot folders, Ollama's insides.

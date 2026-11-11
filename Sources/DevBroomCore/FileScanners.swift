@@ -57,7 +57,7 @@ public struct FileScanners: Sendable {
     public func xcodeExtras() throws -> CategoryResult {
         var items: [CleanItem] = []
         for (label, folder) in locations.xcodeExtras {
-            for u in try children(folder) {
+            for u in try children(folder) where isVisibleFolder(u) {
                 items.append(try makeItem(.xcodeExtras, u, name: "\(label): \(u.lastPathComponent)", detail: abbreviate(folder.standardizedFileURL.path)))
             }
         }
@@ -67,10 +67,14 @@ public struct FileScanners: Sendable {
     /// Emulators (`<name>.avd`; its `<name>.ini` goes to the Trash with it) and SDK system images per Android version.
     public func androidEmulators() throws -> CategoryResult {
         var items: [CleanItem] = []
-        for u in try children(locations.androidAVDs) where u.pathExtension == "avd" {
-            items.append(try makeItem(.androidEmulators, u, name: u.deletingPathExtension().lastPathComponent, detail: "Emulator"))
+        for u in try children(locations.androidAVDs) where u.pathExtension == "avd" && isVisibleFolder(u) {
+            var it = try makeItem(.androidEmulators, u, name: u.deletingPathExtension().lastPathComponent, detail: "Emulator")
+            // A running emulator holds *.lock files in its folder.
+            let names = (try? FileManager.default.contentsOfDirectory(atPath: u.path)) ?? []
+            if names.contains(where: { $0.hasSuffix(".lock") }) { it.tags.insert(.inUse) }
+            items.append(it)
         }
-        for u in try children(locations.androidSystemImages) {
+        for u in try children(locations.androidSystemImages) where isVisibleFolder(u) {
             items.append(try makeItem(.androidEmulators, u, name: "System image \(u.lastPathComponent)", detail: abbreviate(u.standardizedFileURL.path)))
         }
         return result(.androidEmulators, items)
@@ -135,7 +139,7 @@ public struct FileScanners: Sendable {
                       v.isDirectory == true, v.isSymbolicLink != true else { continue }
                 let name = u.lastPathComponent
                 if packageCachePaths.contains(u.standardizedFileURL.path) { en.skipDescendants(); continue }
-                if projectBuildFolderNames.contains(name), let eco = buildEcosystem(of: u) {
+                if projectBuildFolderNames.contains(name), let eco = buildEcosystem(of: u, home: locations.home) {
                     // Git-tracked candidates are not listed but are walked into like any other folder (spec 4.2).
                     if !tracked(u) {
                         en.skipDescendants()
@@ -174,8 +178,9 @@ public struct FileScanners: Sendable {
             if seen.insert(m.standardizedFileURL.path).inserted { models.append(try modelItem(m)) }
         }
         for root in locations.lmStudioModels {
-            for publisher in try children(root) {
-                for m in try children(publisher) where seen.insert(m.standardizedFileURL.path).inserted {
+            for publisher in try children(root) where isVisibleFolder(publisher) {
+                // Resolved path: an old LM Studio folder may be a link to the new one; list each model once.
+                for m in try children(publisher) where isVisibleFolder(m) && seen.insert(m.resolvingSymlinksInPath().path).inserted {
                     models.append(try makeItem(.aiModels, m, name: "\(publisher.lastPathComponent)/\(m.lastPathComponent)",
                                                detail: "LM Studio"))
                 }
@@ -210,6 +215,10 @@ public struct FileScanners: Sendable {
     // MARK: helpers
 
     private func exists(_ u: URL) -> Bool { FileManager.default.fileExists(atPath: u.path) }
+
+    private func isVisibleFolder(_ u: URL) -> Bool {
+        !u.lastPathComponent.hasPrefix(".") && (try? u.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true
+    }
 
     private func children(_ dir: URL) throws -> [URL] {
         guard exists(dir) else { return [] }

@@ -118,6 +118,14 @@ private func cleanItem(_ id: String, _ method: RemovalMethod, bytes: Int64 = 100
         #expect(!FileManager.default.fileExists(atPath: avd.path) && !FileManager.default.fileExists(atPath: ini.path))
     }
 
+    @Test func iniOutsideTheAvdFolderIsLeftAlone() async throws {
+        let cache = try h.make("Library/Caches/x.avd/f").deletingLastPathComponent()
+        let ini = try h.make("Library/Caches/x.ini")
+        let r = await cleaner.clean([cleanItem("c", .trash(cache))]) { _, _ in }
+        #expect(r.outcomes["c"] == .trashed(bytes: 100))
+        #expect(FileManager.default.fileExists(atPath: ini.path))
+    }
+
     @Test func trashesPathWithSpaces() async throws {
         let d = try h.make("Library/Developer/Xcode/iOS DeviceSupport/18.1 (22B83)/f").deletingLastPathComponent()
         let r = await cleaner.clean([cleanItem("a", .trash(d))]) { _, _ in }

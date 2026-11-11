@@ -7,10 +7,10 @@ struct GuideView: View {
     @State private var page = 0
 
     private var cards: [(symbol: String, title: String, text: String)] { [
-        ("arrow.triangle.2.circlepath", "Rebuilds or Re-download",
+        ("arrow.triangle.2.circlepath", "Rebuilds vs Re-download",
          "Rebuilds rows come back on their own, so old ones start ticked. Re-download rows (simulators, models, emulators) must be downloaded again later: they show an orange warning and are never ticked for you."),
-        ("trash", "Everything goes to the Trash first",
-         "Clean moves items to the Trash, so you can put them back. To get the space now, press Delete from Trash now after a clean: it deletes only what DevBroom just moved."),
+        ("trash", "Most things go to the Trash first",
+         "Clean moves most items to the Trash, so you can put them back. Simulators and Docker are removed for good, and DevBroom asks again first. To get Trash space back now, press Delete from Trash now after a clean: it deletes only what DevBroom just moved."),
         ("clock", "Recent work is left alone",
          "Anything used in the last \(recentDays) days starts unticked and is tagged recently used. Right-click an item to reveal it in Finder or hide it from DevBroom."),
     ] }

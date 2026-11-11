@@ -40,8 +40,13 @@ struct ProjectRulesTests {
         for p in ["n/.build", "n/.next", "n/.turbo", "n/.parcel-cache", "n/.gradle"] {
             #expect(buildEcosystem(of: try h.dir(p)) == nil, "\(p)")
         }
-        // Gradle's own ~/.gradle is never a project build folder.
-        #expect(buildEcosystem(of: FileManager.default.homeDirectoryForCurrentUser.appending(path: ".gradle")) == nil)
+        // Gradle's own ~/.gradle is never a project build folder, even with a Gradle file in home.
+        let home = try TempHome()
+        try home.make("settings.gradle"); try home.dir(".gradle/caches")
+        #expect(buildEcosystem(of: home.url.appending(path: ".gradle"), home: home.url) == nil)
+        #expect(buildEcosystem(of: home.url.appending(path: ".gradle")) == .gradle)  // without the home it would count
+        let g = RemovalGuard(locations: Locations(home: home.url), scanRoots: [home.url])
+        #expect(!g.allows(home.url.appending(path: ".gradle")))
     }
 
     @Test func missingMarkerIsNil() throws {

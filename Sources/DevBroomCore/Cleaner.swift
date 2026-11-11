@@ -86,9 +86,10 @@ public struct Cleaner: Sendable {
     public func clean(_ items: [CleanItem], progress: (Int, Int) -> Void) async -> CleanReport {
         var report = CleanReport()
         for (i, item) in items.enumerated() {
-            let (outcome, landed) = await remove(item)
+            let (outcome, landed, note) = await remove(item)
             report.outcomes[item.id] = outcome
-            if let landed { report.trashedItems.append(TrashedItem(url: landed, bytes: item.sizeBytes)) }
+            for (i, u) in landed.enumerated() { report.trashedItems.append(TrashedItem(url: u, bytes: i == 0 ? item.sizeBytes : 0)) }
+            if let note { report.failures.append((item.name, note)) }
             switch outcome {
             case .trashed(let b): report.trashedBytes += b
             case .deleted(let b): report.deletedBytes += b
@@ -100,29 +101,33 @@ public struct Cleaner: Sendable {
         return report
     }
 
-    /// The outcome, plus where a trashed item ended up.
-    private func remove(_ item: CleanItem) async -> (ItemOutcome, URL?) {
+    /// The outcome, where trashed things ended up (the item first), and a note for a partial problem.
+    private func remove(_ item: CleanItem) async -> (ItemOutcome, [URL], String?) {
         switch item.method {
         case .trash(let url):
-            guard FileManager.default.fileExists(atPath: url.path) else { return (.alreadyGone, nil) }
-            guard removalGuard.allows(url) else { return (.failed("Refused by safety guard"), nil) }
-            do {
-                let landed = try trash(url)
-                // An Android emulator is `<name>.avd` plus `<name>.ini`; leaving the .ini would show a broken emulator.
-                if url.pathExtension == "avd" {
-                    let ini = url.deletingPathExtension().appendingPathExtension("ini")
-                    if FileManager.default.fileExists(atPath: ini.path), removalGuard.allows(ini) { _ = try? trash(ini) }
+            guard FileManager.default.fileExists(atPath: url.path) else { return (.alreadyGone, [], nil) }
+            guard removalGuard.allows(url) else { return (.failed("Refused by safety guard"), [], nil) }
+            let landed: URL?
+            do { landed = try trash(url) } catch { return (.failed(error.localizedDescription), [], nil) }
+            var all = landed.map { [$0] } ?? []
+            var note: String?
+            // An Android emulator is `<name>.avd` plus `<name>.ini`; leaving the .ini would show a broken emulator.
+            let avdFolder = Locations(home: home).androidAVDs.standardizedFileURL.path
+            if url.pathExtension == "avd", url.deletingLastPathComponent().standardizedFileURL.path == avdFolder {
+                let ini = url.deletingPathExtension().appendingPathExtension("ini")
+                if FileManager.default.fileExists(atPath: ini.path) {
+                    if removalGuard.allows(ini), let i = try? trash(ini) { all.append(i) }
+                    else { note = "\(ini.lastPathComponent) was left behind; delete the emulator in Android Studio" }
                 }
-                return (.trashed(bytes: item.sizeBytes), landed)
             }
-            catch { return (.failed(error.localizedDescription), nil) }
+            return (.trashed(bytes: item.sizeBytes), all, note)
         case .simctlDevice(let udid):
-            return (await run(ToolLocator.xcrun, ["simctl", "delete", udid], item), nil)
+            return (await run(ToolLocator.xcrun, ["simctl", "delete", udid], item), [], nil)
         case .simctlRuntime(let id):
-            return (await run(ToolLocator.xcrun, ["simctl", "runtime", "delete", id], item), nil)
+            return (await run(ToolLocator.xcrun, ["simctl", "runtime", "delete", id], item), [], nil)
         case .dockerPrune:
-            guard let docker = ToolLocator.docker(home: home) else { return (.failed("Docker not found"), nil) }
-            return (await run(docker, ["system", "prune", "-a", "-f"], item), nil)
+            guard let docker = ToolLocator.docker(home: home) else { return (.failed("Docker not found"), [], nil) }
+            return (await run(docker, ["system", "prune", "-a", "-f"], item), [], nil)
         }
     }
 
