@@ -91,7 +91,7 @@ Anything moved to the Trash can be put back until you empty the Trash. The few p
 
 ## How it works
 
-1. **Click the menu bar icon.** The last results appear at once, then each row refreshes as the new scan finishes.
+1. **Click the menu bar icon.** The last results appear at once, then each row refreshes as the new scan finishes. A small spinner marks the rows still scanning. The very first time, three short welcome cards explain the basics.
 2. **Pick what to clear.** Old, rebuildable items are already ticked. Open any row to tick or untick single items.
 3. **Press Clean.** A summary lists what moves to the Trash and what gets deleted permanently, with sizes.
 4. **Confirm.** DevBroom works through the list, skips anything that fails, and tells you what it moved.
@@ -102,7 +102,8 @@ Handy extras:
 - **Menu bar broom:** shows your free space and turns orange when it drops below your low-space limit.
 - **Item counts, sorting and search:** each row shows how many items it holds. Open a row to sort by size, least recently used or name, and to search rows with more than 10 items.
 - **Hide from DevBroom:** right-click an item you always want to keep. It is never offered again until you unhide it in Settings.
-- **Keyboard:** ⌘R rescans, ⌘⏎ opens the Clean summary (nothing is removed before you confirm), Esc closes.
+- **Keyboard:** ⌘R rescans, ⌘⏎ opens the Clean summary (nothing is removed before you confirm), ⌘, opens Settings, Esc closes.
+- **Works with several screens:** Settings opens in front, on the screen your mouse is on.
 
 Closing the panel stops the scan straight away. Rows that didn't finish keep their old numbers and say "not updated".
 
@@ -112,8 +113,8 @@ Closing the panel stops the scan straight away. Rows that didn't finish keep the
 2. **No background scanning.** It scans only while the panel is open. While closed, the only work is a cheap free-space check every minute.
 3. **No waiting.** Opening the panel shows the last results at once.
 4. **Nothing removed without you.** Nothing is removed until you press Clean and confirm the summary.
-5. **Build folders need a project marker.** A build folder is listed only when its project file is present: next to it (for example `build.gradle`, `pubspec.yaml`, `Cargo.toml`, `hvigorfile.ts`, an `.xcodeproj`), or inside it for `.venv`. It is skipped when git tracks any file inside it. "Recently used" is measured over the whole project, so an edit in another module protects the build folder.
-6. **Model downloads are never ticked.** They always start unticked and show the re-download warning.
+5. **Build folders need a project marker.** A build folder is listed only when its project file is present: next to it (for example `build.gradle` or `settings.gradle`, `pubspec.yaml`, `Cargo.toml`, `Package.swift`, `package.json`, `hvigorfile.ts`, an `.xcodeproj`), or inside it for `.venv`. Gradle's own `~/.gradle` cache is never treated as a project build. It is skipped when git tracks any file inside it. "Recently used" is measured over the whole project, so an edit in another module protects the build folder.
+6. **Re-downloads are never ticked.** AI models, Android emulators, simulators and other re-download items always start unticked and show the warning. A running Android emulator is also tagged "in use".
 7. **Only old extension versions are offered.** DevBroom lists an editor extension only when a newer version of the same extension sits next to it, and never one listed in the editor's `extensions.json`. If that file is missing, nothing is offered.
 8. **One gatekeeper.** Every removal passes a single safety check that refuses anything outside the known locations, anything inside an app bundle, and symbolic links.
 
@@ -125,7 +126,7 @@ Closing the panel stops the scan straight away. Rows that didn't finish keep the
 Requirements:
 
 - macOS 14 Sonoma or later, on Apple silicon or Intel.
-- Optional: Xcode (for the simulator rows) and Docker Desktop (for the Docker row). Rows for tools you don't have are simply hidden or greyed out.
+- Optional: Xcode (for the simulator rows) and Docker Desktop (for the Docker row). Rows for tools you don't have are simply hidden, greyed out or empty.
 
 ## First launch
 
@@ -147,7 +148,7 @@ You may then see two more prompts:
 
 ## Settings
 
-Open the panel and click **Settings**.
+Open the panel and click **Settings** (or press ⌘,).
 
 | Setting | Default | What it does |
 |---|---|---|
@@ -155,6 +156,7 @@ Open the panel and click **Settings**.
 | Notify below | 15 GB free | Sends one alert when free space drops below this. |
 | Project scan roots | Your home folder | Where DevBroom looks for `node_modules`, build folders and model downloads. Hidden folders and `~/Library` are always skipped. |
 | Hidden items | None | Items you hid from the panel. Unhide brings them back at the next scan. |
+| Show guide again | | Shows the three welcome cards again in the panel. |
 | Launch at login | Off | Starts DevBroom when you log in. |
 
 ## FAQ
