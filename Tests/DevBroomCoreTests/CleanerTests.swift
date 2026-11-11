@@ -110,6 +110,14 @@ private func cleanItem(_ id: String, _ method: RemovalMethod, bytes: Int64 = 100
         #expect(FileManager.default.fileExists(atPath: f.path) && FileManager.default.fileExists(atPath: fake.path))
     }
 
+    @Test func androidEmulatorIniGoesWithIt() async throws {
+        let avd = try h.make(".android/avd/Pixel_8.avd/config.ini").deletingLastPathComponent()
+        let ini = try h.make(".android/avd/Pixel_8.ini")
+        let r = await cleaner.clean([cleanItem("a", .trash(avd))]) { _, _ in }
+        #expect(r.outcomes["a"] == .trashed(bytes: 100))
+        #expect(!FileManager.default.fileExists(atPath: avd.path) && !FileManager.default.fileExists(atPath: ini.path))
+    }
+
     @Test func trashesPathWithSpaces() async throws {
         let d = try h.make("Library/Developer/Xcode/iOS DeviceSupport/18.1 (22B83)/f").deletingLastPathComponent()
         let r = await cleaner.clean([cleanItem("a", .trash(d))]) { _, _ in }

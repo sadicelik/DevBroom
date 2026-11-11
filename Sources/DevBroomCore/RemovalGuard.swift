@@ -11,6 +11,7 @@ public struct RemovalGuard: Sendable {
         let scanRoots: [[String]]
         let hub: [String]
         let extensionFolders: [[String]]
+        let lmStudio: [[String]]
 
         enum Match { case no, other, build }
 
@@ -19,6 +20,8 @@ public struct RemovalGuard: Sendable {
             if p.contains(where: { $0.lowercased().hasSuffix(".app") }) { return .no }
             if p.count >= 2, extensionFolders.contains(Array(p.dropLast())) { return .other }
             if exact.contains(p) { return .other }
+            // LM Studio: <models>/<publisher>/<model>.
+            if lmStudio.contains(where: { p.count == $0.count + 2 && p.starts(with: $0) }) { return .other }
             if categoryFolders.contains(where: { p.count == $0.count + 1 && p.starts(with: $0) }) { return .other }
             guard let last = p.last, p.count >= 2 else { return .no }
             let isModel = last.hasPrefix("models--") || last.hasPrefix("datasets--")
@@ -35,8 +38,8 @@ public struct RemovalGuard: Sendable {
                 // Outside home: every component counts.
                 dotOK = !p.dropFirst().dropLast().contains { $0.hasPrefix(".") }
             }
-            // The last component may start with a dot only for .hvigor / .venv.
-            guard dotOK, !last.hasPrefix(".") || last == ".hvigor" || last == ".venv" else { return .no }
+            // The last component may start with a dot only for build folder names (.hvigor, .venv, .build, ...).
+            guard dotOK, !last.hasPrefix(".") || isBuild else { return .no }
             return isBuild ? .build : .other
         }
     }
@@ -47,11 +50,13 @@ public struct RemovalGuard: Sendable {
     public init(locations: Locations, scanRoots: [URL]) {
         func make(_ f: (URL) -> [String]) -> Rules {
             Rules(home: f(locations.home),
-                  categoryFolders: ([locations.caches, locations.derivedData, locations.wallpaperVideos]
-                    + locations.deviceSupportFolders).map(f),
-                  exact: locations.packageCaches.map { f($0.url) },
+                  categoryFolders: ([locations.caches, locations.derivedData, locations.wallpaperVideos,
+                                     locations.androidAVDs, locations.androidSystemImages]
+                    + locations.deviceSupportFolders + locations.xcodeExtras.map(\.url)).map(f),
+                  exact: (locations.packageCaches.map(\.url) + [locations.ollamaModels]).map(f),
                   scanRoots: scanRoots.map(f), hub: f(locations.huggingFaceHub),
-                  extensionFolders: locations.editorExtensions.map { f($0.url) })
+                  extensionFolders: locations.editorExtensions.map { f($0.url) },
+                  lmStudio: locations.lmStudioModels.map(f))
         }
         plain = make { $0.standardizedFileURL.pathComponents }
         resolved = make { $0.resolvingSymlinksInPath().pathComponents }

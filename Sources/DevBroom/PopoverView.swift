@@ -6,6 +6,8 @@ extension CategoryID {
     var color: Color {
         switch self {
         case .derivedData: .blue
+        case .xcodeExtras: Color(red: 0.45, green: 0.6, blue: 1.0)
+        case .androidEmulators: Color(red: 0.24, green: 0.86, blue: 0.52)
         case .packageCaches: .teal
         case .appCaches: .cyan
         case .nodeModules: .green

@@ -24,6 +24,26 @@ struct ProjectRulesTests {
         #expect(buildEcosystem(of: h.url.appending(path: "v/.venv")) == .python)
     }
 
+    @Test func newBuildFolderMarkers() throws {
+        try h.make("s/Package.swift"); try h.dir("s/.build")
+        #expect(buildEcosystem(of: h.url.appending(path: "s/.build")) == .swiftPM)
+        for name in [".next", ".turbo", ".parcel-cache"] {
+            try h.make("w/package.json"); try h.dir("w/\(name)")
+            #expect(buildEcosystem(of: h.url.appending(path: "w/\(name)")) == .web, "\(name)")
+        }
+        for marker in ["build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts"] {
+            let d = "g-\(UUID().uuidString)"
+            try h.make("\(d)/\(marker)"); try h.dir("\(d)/.gradle")
+            #expect(buildEcosystem(of: h.url.appending(path: "\(d)/.gradle")) == .gradle, "\(marker)")
+        }
+        // Without markers: nothing.
+        for p in ["n/.build", "n/.next", "n/.turbo", "n/.parcel-cache", "n/.gradle"] {
+            #expect(buildEcosystem(of: try h.dir(p)) == nil, "\(p)")
+        }
+        // Gradle's own ~/.gradle is never a project build folder.
+        #expect(buildEcosystem(of: FileManager.default.homeDirectoryForCurrentUser.appending(path: ".gradle")) == nil)
+    }
+
     @Test func missingMarkerIsNil() throws {
         #expect(buildEcosystem(of: try h.dir("a/build")) == nil)
         #expect(buildEcosystem(of: try h.dir("a/oh_modules")) == nil)

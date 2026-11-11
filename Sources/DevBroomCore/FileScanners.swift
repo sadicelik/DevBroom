@@ -54,6 +54,28 @@ public struct FileScanners: Sendable {
         return result(.appCaches, items)
     }
 
+    public func xcodeExtras() throws -> CategoryResult {
+        var items: [CleanItem] = []
+        for (label, folder) in locations.xcodeExtras {
+            for u in try children(folder) {
+                items.append(try makeItem(.xcodeExtras, u, name: "\(label): \(u.lastPathComponent)", detail: abbreviate(folder.standardizedFileURL.path)))
+            }
+        }
+        return result(.xcodeExtras, items)
+    }
+
+    /// Emulators (`<name>.avd`; its `<name>.ini` goes to the Trash with it) and SDK system images per Android version.
+    public func androidEmulators() throws -> CategoryResult {
+        var items: [CleanItem] = []
+        for u in try children(locations.androidAVDs) where u.pathExtension == "avd" {
+            items.append(try makeItem(.androidEmulators, u, name: u.deletingPathExtension().lastPathComponent, detail: "Emulator"))
+        }
+        for u in try children(locations.androidSystemImages) {
+            items.append(try makeItem(.androidEmulators, u, name: "System image \(u.lastPathComponent)", detail: abbreviate(u.standardizedFileURL.path)))
+        }
+        return result(.androidEmulators, items)
+    }
+
     public func deviceSupport() throws -> CategoryResult {
         var items: [CleanItem] = []
         for folder in locations.deviceSupportFolders {
@@ -150,6 +172,18 @@ public struct FileScanners: Sendable {
         }
         for m in try children(locations.huggingFaceHub) where modelDisplayName(m.lastPathComponent) != nil {
             if seen.insert(m.standardizedFileURL.path).inserted { models.append(try modelItem(m)) }
+        }
+        for root in locations.lmStudioModels {
+            for publisher in try children(root) {
+                for m in try children(publisher) where seen.insert(m.standardizedFileURL.path).inserted {
+                    models.append(try makeItem(.aiModels, m, name: "\(publisher.lastPathComponent)/\(m.lastPathComponent)",
+                                               detail: "LM Studio"))
+                }
+            }
+        }
+        if exists(locations.ollamaModels), seen.insert(locations.ollamaModels.standardizedFileURL.path).inserted {
+            models.append(try makeItem(.aiModels, locations.ollamaModels, name: "All Ollama models",
+                                       detail: "Ollama keeps models together. Remove single ones with ollama rm."))
         }
         return [result(.nodeModules, nodes, gitTracks: tracked), result(.projectBuilds, builds, gitTracks: tracked),
                 result(.aiModels, models, gitTracks: tracked)]

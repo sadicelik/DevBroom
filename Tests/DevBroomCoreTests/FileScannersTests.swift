@@ -151,6 +151,24 @@ final class FileScannersTests: XCTestCase {
         XCTAssertEqual(try scanners(h).appCaches().items.map(\.detail), ["real"])
     }
 
+    func testV032Scanners() throws {
+        let h = try TempHome()
+        try h.make("Library/Developer/XCPGDevices/ABC/data")
+        try h.make("Library/Developer/Xcode/DocumentationCache/v1/f")
+        try h.make(".android/avd/Pixel_8.avd/config.ini"); try h.make(".android/avd/Pixel_8.ini")
+        try h.make("Library/Android/sdk/system-images/android-34/x")
+        try h.make(".lmstudio/models/pub/model-x/w.gguf")
+        try h.make(".ollama/models/blobs/b")
+        try h.make("s/Package.swift"); try h.make("s/.build/debug/x", modified: ago(60)); try h.make("s/Sources/a.swift", modified: ago(60))
+        let sc = scanners(h)
+        XCTAssertEqual(Set(try sc.xcodeExtras().items.map(\.name)), ["SwiftUI previews: ABC", "Documentation cache: v1"])
+        XCTAssertEqual(Set(try sc.androidEmulators().items.map(\.name)), ["Pixel_8", "System image android-34"])
+        let projects = try sc.projects()
+        XCTAssertEqual(Set(projects[2].items.map(\.name)), ["pub/model-x", "All Ollama models"])
+        XCTAssertTrue(projects[2].items.allSatisfy { $0.kind == .redownload })
+        XCTAssertEqual(projects[1].items.map(\.name), ["s · SwiftPM .build"])
+    }
+
     func testProjectWalkFindsBuildsAndKeepsNodeModules() throws {
         let h = try TempHome()
         try hmosProject(h)

@@ -1,10 +1,13 @@
 import Foundation
 
 public enum Ecosystem: String, Sendable {
-    case harmonyOS = "HarmonyOS", gradle = "Android", flutter = "Flutter", xcode = "Xcode", rust = "Rust", python = "Python"
+    case harmonyOS = "HarmonyOS", gradle = "Android", flutter = "Flutter", xcode = "Xcode", rust = "Rust", python = "Python",
+         swiftPM = "SwiftPM", web = "JavaScript"
 }
 
-public let projectBuildFolderNames: Set<String> = ["build", "oh_modules", ".hvigor", "target", ".venv"]
+/// Names a project build folder can have. Dot names here are the only dot names the walk and guard accept as items.
+public let projectBuildFolderNames: Set<String> = ["build", "oh_modules", ".hvigor", "target", ".venv",
+                                                   ".build", ".next", ".turbo", ".parcel-cache", ".gradle"]
 
 private func exists(_ url: URL, _ name: String) -> Bool {
     FileManager.default.fileExists(atPath: url.appending(path: name).path)
@@ -24,6 +27,13 @@ public func buildEcosystem(of folder: URL) -> Ecosystem? {
     case ".hvigor": return exists(parent, "hvigorfile.ts") ? .harmonyOS : nil
     case "target": return exists(parent, "Cargo.toml") ? .rust : nil
     case ".venv": return exists(folder, "pyvenv.cfg") ? .python : nil
+    case ".build": return exists(parent, "Package.swift") ? .swiftPM : nil
+    case ".next", ".turbo", ".parcel-cache": return exists(parent, "package.json") ? .web : nil
+    case ".gradle":
+        // ~/.gradle is Gradle's own cache (listed under package caches), never a project folder.
+        if parent.standardizedFileURL.path == FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL.path { return nil }
+        let markers = ["build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts"]
+        return markers.contains { exists(parent, $0) } ? .gradle : nil
     default: return nil
     }
 }

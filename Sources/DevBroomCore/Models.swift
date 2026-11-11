@@ -3,12 +3,14 @@ import Foundation
 public enum CleanKind: String, Codable, Sendable { case rebuilds, redownload }
 
 public enum CategoryID: String, Codable, CaseIterable, Sendable {
-    case derivedData, packageCaches, appCaches, nodeModules, projectBuilds, deviceSupport, wallpaper, aiModels,
-         oldExtensions, simDevices, simRuntimes, docker
+    case derivedData, xcodeExtras, packageCaches, appCaches, nodeModules, projectBuilds, deviceSupport, wallpaper, aiModels,
+         androidEmulators, oldExtensions, simDevices, simRuntimes, docker
 
     public var title: String {
         switch self {
         case .derivedData: "Xcode DerivedData"
+        case .xcodeExtras: "Xcode previews and caches"
+        case .androidEmulators: "Android emulators"
         case .packageCaches: "Package caches"
         case .appCaches: "App caches"
         case .nodeModules: "node_modules"
@@ -25,7 +27,7 @@ public enum CategoryID: String, Codable, CaseIterable, Sendable {
 
     public var kind: CleanKind {
         switch self {
-        case .derivedData, .packageCaches, .appCaches, .nodeModules, .projectBuilds, .oldExtensions: .rebuilds
+        case .derivedData, .xcodeExtras, .packageCaches, .appCaches, .nodeModules, .projectBuilds, .oldExtensions: .rebuilds
         default: .redownload
         }
     }

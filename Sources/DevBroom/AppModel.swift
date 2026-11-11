@@ -143,6 +143,8 @@ let isBundled = Bundle.main.bundleIdentifier != nil
         case .appCaches: work = { [try files.appCaches()] }
         case .nodeModules: work = { try files.projects() }
         case .deviceSupport: work = { [try files.deviceSupport()] }
+        case .xcodeExtras: work = { [try files.xcodeExtras()] }
+        case .androidEmulators: work = { [try files.androidEmulators()] }
         case .oldExtensions: work = { [try files.oldExtensions()] }
         case .wallpaper: work = { [try files.wallpaper()] }
         }

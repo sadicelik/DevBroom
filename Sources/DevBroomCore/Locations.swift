@@ -13,6 +13,20 @@ public struct Locations: Sendable {
     }
     public var wallpaperVideos: URL { h("Library/Application Support/com.apple.wallpaper/aerials/videos") }
     public var huggingFaceHub: URL { h(".cache/huggingface/hub") }
+    /// LM Studio keeps models as `<publisher>/<model>` folders; one item per model.
+    public var lmStudioModels: [URL] { [h(".lmstudio/models"), h(".cache/lm-studio/models")] }
+    /// Ollama models share blobs, so the whole folder is one item.
+    public var ollamaModels: URL { h(".ollama/models") }
+    /// One `<name>.avd` folder plus `<name>.ini` file per emulator.
+    public var androidAVDs: URL { h(".android/avd") }
+    public var androidSystemImages: URL { h("Library/Android/sdk/system-images") }
+    /// SwiftUI preview simulators, documentation cache, simulator caches: Xcode recreates them.
+    public var xcodeExtras: [(label: String, url: URL)] {
+        [("SwiftUI previews", h("Library/Developer/XCPGDevices")),
+         ("SwiftUI previews", h("Library/Developer/Xcode/UserData/Previews/Simulator Devices")),
+         ("Documentation cache", h("Library/Developer/Xcode/DocumentationCache")),
+         ("Simulator caches", h("Library/Developer/CoreSimulator/Caches"))]
+    }
     public var editorExtensions: [(editor: String, bundleID: String, url: URL)] {
         [("VS Code", "com.microsoft.VSCode", h(".vscode/extensions")),
          ("Cursor", "com.todesktop.230313mzl4w4u92", h(".cursor/extensions"))]

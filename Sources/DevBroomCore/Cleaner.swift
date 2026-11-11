@@ -106,7 +106,15 @@ public struct Cleaner: Sendable {
         case .trash(let url):
             guard FileManager.default.fileExists(atPath: url.path) else { return (.alreadyGone, nil) }
             guard removalGuard.allows(url) else { return (.failed("Refused by safety guard"), nil) }
-            do { return (.trashed(bytes: item.sizeBytes), try trash(url)) }
+            do {
+                let landed = try trash(url)
+                // An Android emulator is `<name>.avd` plus `<name>.ini`; leaving the .ini would show a broken emulator.
+                if url.pathExtension == "avd" {
+                    let ini = url.deletingPathExtension().appendingPathExtension("ini")
+                    if FileManager.default.fileExists(atPath: ini.path), removalGuard.allows(ini) { _ = try? trash(ini) }
+                }
+                return (.trashed(bytes: item.sizeBytes), landed)
+            }
             catch { return (.failed(error.localizedDescription), nil) }
         case .simctlDevice(let udid):
             return (await run(ToolLocator.xcrun, ["simctl", "delete", udid], item), nil)

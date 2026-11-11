@@ -64,6 +64,31 @@ struct RemovalGuardTests {
         #expect(!g2.allows(root.appending(path: "x/node_modules")))
     }
 
+    @Test func v032Locations() throws {
+        // Allowed.
+        try h.make("s/Package.swift"); try h.make("w/package.json"); try h.make("gr/settings.gradle")
+        for p in ["s/.build", "w/.next", "w/.turbo", "w/.parcel-cache", "gr/.gradle",
+                  ".lmstudio/models/pub/model-x", ".cache/lm-studio/models/pub/model-y",
+                  ".android/avd/Pixel_8.avd", "Library/Android/sdk/system-images/android-34",
+                  "Library/Developer/XCPGDevices/ABC", "Library/Developer/Xcode/UserData/Previews/Simulator Devices/DEF",
+                  "Library/Developer/Xcode/DocumentationCache/v1", "Library/Developer/CoreSimulator/Caches/dyld"] {
+            try h.dir(p)
+            #expect(g.allows(u(p)), "\(p)")
+        }
+        try h.make(".android/avd/Pixel_8.ini")
+        #expect(g.allows(u(".android/avd/Pixel_8.ini")))
+        try h.dir(".ollama/models/blobs")
+        #expect(g.allows(u(".ollama/models")))
+        // Refused: the folders themselves, wrong depths, unmarked dot folders, Ollama's insides.
+        for p in [".lmstudio/models", ".lmstudio/models/pub", ".lmstudio/models/pub/model-x/file.gguf",
+                  ".ollama", ".ollama/models/blobs", ".android/avd", ".android", "Library/Android/sdk/system-images",
+                  "Library/Developer/XCPGDevices", "Library/Developer/CoreSimulator/Caches",
+                  "n/.build", "n/.next", "n/.gradle", ".build"] {
+            try h.dir(p)
+            #expect(!g.allows(u(p)), "\(p)")
+        }
+    }
+
     @Test func projectAndModelFolders() throws {
         try h.make("p/entry/hvigorfile.ts"); try h.dir("p/entry/build")
         try h.make("p/Cargo.toml"); try h.dir("p/target")
