@@ -11,6 +11,8 @@ public final class AppSettings {
     public var scanRoots: [URL] { didSet { defaults.set(scanRoots.map(\.path), forKey: "scanRoots") } }
     /// Items the owner hid ("Hide from DevBroom"): item id to the name shown in Settings.
     public var hiddenItems: [String: String] { didSet { defaults.set(hiddenItems, forKey: "hiddenItems") } }
+    /// The first-run guide was finished or skipped.
+    public var guideSeen: Bool { didSet { defaults.set(guideSeen, forKey: "guideSeen") } }
     public private(set) var launchAtLoginError: String?
 
     @ObservationIgnored private let registrar: (Bool) throws -> Void
@@ -43,6 +45,7 @@ public final class AppSettings {
         lowSpaceLimitGB = defaults.object(forKey: "lowSpaceLimitGB") as? Int ?? 15
         scanRoots = (defaults.stringArray(forKey: "scanRoots") ?? [home.path]).map { URL(fileURLWithPath: $0) }
         hiddenItems = defaults.dictionary(forKey: "hiddenItems") as? [String: String] ?? [:]
+        guideSeen = defaults.bool(forKey: "guideSeen")
         launchAtLogin = defaults.bool(forKey: "launchAtLogin")
     }
 }

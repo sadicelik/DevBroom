@@ -62,6 +62,15 @@ struct StoreAndFreeSpaceTests {
         UserDefaults().removePersistentDomain(forName: suite)
     }
 
+    @MainActor @Test func guideSeenPersists() {
+        let suite = UUID().uuidString
+        let s = AppSettings(defaults: UserDefaults(suiteName: suite)!)
+        #expect(s.guideSeen == false)
+        s.guideSeen = true
+        #expect(AppSettings(defaults: UserDefaults(suiteName: suite)!).guideSeen)
+        UserDefaults().removePersistentDomain(forName: suite)
+    }
+
     @Test func freeBytesForHome() {
         let b = freeBytes(at: FileManager.default.homeDirectoryForCurrentUser)
         #expect(b != nil && b! > 0)

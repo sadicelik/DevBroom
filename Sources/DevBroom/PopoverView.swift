@@ -38,6 +38,8 @@ struct PopoverView: View {
             // A clean in progress or an undismissed report takes over the popover, also after reopening.
             if let sheet = cleanSheet ?? (model.isCleaning || model.lastReport != nil ? ([], []) : nil) {
                 CleanSheet(model: model, items: sheet.items, recentlyUnticked: sheet.recent) { cleanSheet = nil }
+            } else if !model.settings.guideSeen {
+                GuideView(recentDays: model.settings.cutoffDays) { model.settings.guideSeen = true }
             } else {
                 main
             }
@@ -210,6 +212,9 @@ private struct CategoryRow: View {
                     caption
                 }
                 Spacer()
+                if model.isScanning, category.status == .notUpdated {
+                    ProgressView().controlSize(.mini).accessibilityLabel("Scanning \(category.id.title)")
+                }
                 Text(bytes(category.sizeBytes)).monospacedDigit()
             }
             .opacity(category.status.isUnavailable ? 0.5 : 1)

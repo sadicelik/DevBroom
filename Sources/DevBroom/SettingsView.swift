@@ -43,6 +43,11 @@ struct SettingsView: View {
                 }
             }
             Section {
+                Button("Show guide again") { settings.guideSeen = false }
+            } footer: {
+                Text("Shows the three welcome cards the next time you open the panel.").font(.caption).foregroundStyle(.secondary)
+            }
+            Section {
                 Toggle("Launch at login", isOn: $settings.launchAtLogin).disabled(!isBundled)
                 if !isBundled {
                     Text("Available in the installed app").font(.caption).foregroundStyle(.secondary)

@@ -45,6 +45,11 @@ Built for small-disk Macs (it started on a 256 GB MacBook Air) where clearing ca
 | <img src="docs/assets/clean-done.png" alt="Result with Delete from Trash now" width="300"> | <img src="docs/assets/settings.png" alt="Settings window" width="300"> |
 | Get the space back straight away: delete only what DevBroom just moved from the Trash. | Recently-used window, low-space alert, project folders. |
 
+| First run |
+|---|
+| <img src="docs/assets/guide.png" alt="First-run guide" width="300"> |
+| Three short cards explain the basics. Bring them back any time from Settings. |
+
 ## What it cleans
 
 Each row is one of two kinds:
@@ -57,6 +62,7 @@ Each row is one of two kinds:
 | Category | Kind | How it's removed |
 |---|---|---|
 | Xcode DerivedData | Rebuilds | Trash |
+| Xcode previews and caches (SwiftUI preview simulators, documentation cache, simulator caches) | Rebuilds | Trash |
 | iOS DeviceSupport | Re-download | Trash |
 | Simulator devices | Re-download | `xcrun simctl delete`, permanent |
 | Simulator runtimes | Re-download | `xcrun simctl runtime delete`, permanent |
@@ -67,7 +73,8 @@ Each row is one of two kinds:
 | Category | Kind | How it's removed |
 |---|---|---|
 | `node_modules` | Rebuilds | Trash |
-| Project builds: HarmonyOS `build`, `oh_modules`, `.hvigor` · Android/Gradle `build` · Flutter `build` · Xcode `build` · Rust `target` · Python `.venv` | Rebuilds | Trash |
+| Project builds: HarmonyOS `build`, `oh_modules`, `.hvigor` · Android/Gradle `build`, `.gradle` · Flutter `build` · Xcode `build` · SwiftPM `.build` · Rust `target` · Python `.venv` · Next.js `.next`, Turborepo `.turbo`, Parcel `.parcel-cache` | Rebuilds | Trash |
+| Android emulators (`~/.android/avd`) and SDK system images | Re-download | Trash |
 
 ### Caches and downloads
 
@@ -76,7 +83,7 @@ Each row is one of two kinds:
 | Package caches: npm, Yarn, pnpm, pip, uv, Homebrew, CocoaPods, Gradle, Gradle wrapper, Cargo, Go modules, Bun | Rebuilds | Trash |
 | Package caches: Maven, Dart/Flutter | Re-download | Trash |
 | App caches (`~/Library/Caches`) | Rebuilds | Trash |
-| AI model downloads (Hugging Face models and datasets) | Re-download | Trash |
+| AI model downloads: Hugging Face models and datasets, LM Studio models, Ollama models (all together) | Re-download | Trash |
 | Old VS Code and Cursor extension versions | Rebuilds | Trash |
 | Docker images, build cache and stopped containers | Re-download | `docker system prune -a -f`, permanent (volumes are never touched) |
 

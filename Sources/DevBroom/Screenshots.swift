@@ -16,6 +16,7 @@ import SwiftUI
         defer { defaults.removePersistentDomain(forName: "DevBroomScreenshots") }
         let settings = AppSettings(defaults: defaults, home: URL(fileURLWithPath: "/Users/you"), registrar: { _ in })
         settings.hiddenItems = ["/Users/you/code/client-app/node_modules": "client-app"]
+        settings.guideSeen = true
         let model = AppModel(demoSettings: settings, results: demoResults(), freeBytes: 21_400_000_000,
                              totalBytes: 245_100_000_000)
 
@@ -23,6 +24,7 @@ import SwiftUI
         render(CleanSheet(model: model, items: model.selectedItems, recentlyUnticked: [], dismiss: {}).padding(12),
                width: 424, to: dir.appending(path: "clean-summary.png"))
         render(SettingsView(settings: settings), width: 440, to: dir.appending(path: "settings.png"))
+        render(GuideView {}.padding(12), width: 424, to: dir.appending(path: "guide.png"))
         var report = CleanReport()
         let trashed = model.selectedItems.filter { !$0.method.isPermanent }
         report.trashedBytes = trashed.reduce(0) { $0 + $1.sizeBytes }
