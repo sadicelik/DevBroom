@@ -9,6 +9,7 @@ import SwiftUI
         let args = CommandLine.arguments
         guard let i = args.firstIndex(of: "--render-screenshots"), i + 1 < args.count else { return }
         let dir = URL(fileURLWithPath: args[i + 1])
+        SettingsWindow.isEnabled = false
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
 
         let defaults = UserDefaults(suiteName: "DevBroomScreenshots")!

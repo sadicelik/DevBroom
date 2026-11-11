@@ -54,6 +54,7 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .frame(width: 440)
+        .background(WindowGrabber { SettingsWindow.window = $0; SettingsWindow.bringToFront() })
     }
 
     private func addRoots() {
@@ -64,4 +65,39 @@ struct SettingsView: View {
         guard panel.runModal() == .OK else { return }
         settings.scanRoots += panel.urls.filter { !settings.scanRoots.contains($0) }
     }
+}
+
+/// DevBroom has no Dock icon, so macOS opens its Settings window behind other apps, possibly on another display.
+/// This brings it to the front on the screen the mouse is on.
+@MainActor enum SettingsWindow {
+    static weak var window: NSWindow?
+    /// Off while rendering README screenshots, so the off-screen render window is never shown.
+    static var isEnabled = true
+
+    static func bringToFront() {
+        guard isEnabled else { return }
+        NSApp.activate(ignoringOtherApps: true)
+        // On first open the window doesn't exist yet; WindowGrabber calls this again once it does.
+        DispatchQueue.main.async {
+            guard let w = window else { return }
+            if let screen = NSScreen.screens.first(where: { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) }),
+               w.screen != screen {
+                let f = screen.visibleFrame
+                w.setFrameOrigin(NSPoint(x: f.midX - w.frame.width / 2, y: f.midY - w.frame.height / 2))
+            }
+            w.makeKeyAndOrderFront(nil)
+            w.orderFrontRegardless()
+        }
+    }
+}
+
+/// Hands the hosting NSWindow to `found` once the view is in a window.
+private struct WindowGrabber: NSViewRepresentable {
+    let found: (NSWindow) -> Void
+    func makeNSView(context: Context) -> NSView {
+        let v = NSView()
+        DispatchQueue.main.async { if let w = v.window { found(w) } }
+        return v
+    }
+    func updateNSView(_ nsView: NSView, context: Context) {}
 }

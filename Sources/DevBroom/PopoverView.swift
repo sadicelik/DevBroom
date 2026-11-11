@@ -23,6 +23,7 @@ extension CategoryID {
 
 struct PopoverView: View {
     let model: AppModel
+    @Environment(\.openSettings) private var openSettings
     /// Snapshot taken when the summary opens (spec section 4 rule 4): exactly these items are shown and cleaned.
     @State private var cleanSheet: (items: [CleanItem], recent: [String])?
     /// Height of the category list's content, so the panel fits it (up to a maximum) instead of a fixed size.
@@ -74,8 +75,11 @@ struct PopoverView: View {
                 .keyboardShortcut(.return, modifiers: .command)  // opens the summary; nothing is removed before Confirm
                 .disabled(model.selectedItems.isEmpty || model.isCleaning || preparing)
                 Spacer()
-                SettingsLink { Text("Settings") }
-                    .simultaneousGesture(TapGesture().onEnded { NSApp.activate(ignoringOtherApps: true) })
+                Button("Settings") {
+                    openSettings()
+                    SettingsWindow.bringToFront()
+                }
+                .keyboardShortcut(",", modifiers: .command)
                 Button("Quit") { NSApp.terminate(nil) }
             }
         }
