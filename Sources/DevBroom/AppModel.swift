@@ -159,7 +159,7 @@ let isBundled = Bundle.main.bundleIdentifier != nil
     }
 
     private func land(_ fresh: CategoryResult) {
-        var r = fresh
+        var r = removingHidden(fresh, hidden: settings.hiddenItems.keys)
         r.items = r.items.filter { !$0.name.hasPrefix(".") }.sorted { $0.sizeBytes > $1.sizeBytes }
         if let i = results.firstIndex(where: { $0.id == r.id }) { results[i] = r } else {
             results.append(r)
@@ -175,6 +175,20 @@ let isBundled = Bundle.main.bundleIdentifier != nil
     private func save() { if !isDemo { try? store.save(results) } }
 
     // MARK: selection
+
+    /// "Hide from DevBroom": never offered, ticked, counted or cleaned again until unhidden in Settings.
+    func hide(_ item: CleanItem) {
+        settings.hiddenItems[item.id] = item.name
+        selected.remove(item.id)
+        for i in results.indices { results[i] = removingHidden(results[i], hidden: [item.id]) }
+        save()
+    }
+
+    /// Free space is below the low-space alert limit (menu bar icon turns orange).
+    var isLowOnSpace: Bool {
+        guard let free = freeBytes else { return false }
+        return free < Int64(settings.lowSpaceLimitGB) * 1_000_000_000
+    }
 
     func toggle(item: CleanItem) {
         touched.insert(item.id)

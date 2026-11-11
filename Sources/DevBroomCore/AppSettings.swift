@@ -9,6 +9,8 @@ public final class AppSettings {
     public var cutoffDays: Int { didSet { defaults.set(cutoffDays, forKey: "cutoffDays") } }
     public var lowSpaceLimitGB: Int { didSet { defaults.set(lowSpaceLimitGB, forKey: "lowSpaceLimitGB") } }
     public var scanRoots: [URL] { didSet { defaults.set(scanRoots.map(\.path), forKey: "scanRoots") } }
+    /// Items the owner hid ("Hide from DevBroom"): item id to the name shown in Settings.
+    public var hiddenItems: [String: String] { didSet { defaults.set(hiddenItems, forKey: "hiddenItems") } }
     public private(set) var launchAtLoginError: String?
 
     @ObservationIgnored private let registrar: (Bool) throws -> Void
@@ -40,6 +42,7 @@ public final class AppSettings {
         cutoffDays = defaults.object(forKey: "cutoffDays") as? Int ?? 14
         lowSpaceLimitGB = defaults.object(forKey: "lowSpaceLimitGB") as? Int ?? 15
         scanRoots = (defaults.stringArray(forKey: "scanRoots") ?? [home.path]).map { URL(fileURLWithPath: $0) }
+        hiddenItems = defaults.dictionary(forKey: "hiddenItems") as? [String: String] ?? [:]
         launchAtLogin = defaults.bool(forKey: "launchAtLogin")
     }
 }

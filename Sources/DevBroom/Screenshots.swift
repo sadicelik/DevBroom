@@ -14,6 +14,7 @@ import SwiftUI
         let defaults = UserDefaults(suiteName: "DevBroomScreenshots")!
         defer { defaults.removePersistentDomain(forName: "DevBroomScreenshots") }
         let settings = AppSettings(defaults: defaults, home: URL(fileURLWithPath: "/Users/you"), registrar: { _ in })
+        settings.hiddenItems = ["/Users/you/code/client-app/node_modules": "client-app"]
         let model = AppModel(demoSettings: settings, results: demoResults(), freeBytes: 21_400_000_000,
                              totalBytes: 245_100_000_000)
 

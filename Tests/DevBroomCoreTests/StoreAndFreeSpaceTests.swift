@@ -52,6 +52,16 @@ struct StoreAndFreeSpaceTests {
         #expect(s.scanRoots == [home])
     }
 
+    @MainActor @Test func hiddenItemsPersist() {
+        let suite = UUID().uuidString
+        let s = AppSettings(defaults: UserDefaults(suiteName: suite)!)
+        #expect(s.hiddenItems.isEmpty)
+        s.hiddenItems["/Users/you/code/keep/node_modules"] = "keep"
+        let again = AppSettings(defaults: UserDefaults(suiteName: suite)!)
+        #expect(again.hiddenItems == ["/Users/you/code/keep/node_modules": "keep"])
+        UserDefaults().removePersistentDomain(forName: suite)
+    }
+
     @Test func freeBytesForHome() {
         let b = freeBytes(at: FileManager.default.homeDirectoryForCurrentUser)
         #expect(b != nil && b! > 0)

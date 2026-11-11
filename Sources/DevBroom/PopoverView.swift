@@ -57,7 +57,7 @@ struct PopoverView: View {
                 }
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listHeight = $0 }
             }
-            .frame(height: min(listHeight, 420))
+            .frame(height: min(listHeight, 520))
             Divider()
             HStack {
                 Button("Clean \(bytes(model.selectedBytes))") {
@@ -67,6 +67,7 @@ struct PopoverView: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.return, modifiers: .command)  // opens the summary; nothing is removed before Confirm
                 .disabled(model.selectedItems.isEmpty || model.isCleaning)
                 Spacer()
                 SettingsLink { Text("Settings") }
@@ -92,7 +93,9 @@ struct PopoverView: View {
             }
             Spacer()
             if model.isScanning { ProgressView().controlSize(.small) }
-            Button("Rescan") { model.rescan() }.disabled(model.isScanning)
+            Button("Rescan") { model.rescan() }
+                .keyboardShortcut("r", modifiers: .command)
+                .disabled(model.isScanning)
         }
     }
 
@@ -163,10 +166,28 @@ private struct StorageBar: View {
 private struct CategoryRow: View {
     let model: AppModel
     let category: CategoryResult
+    @State private var sort: ItemSort = .size
+    @State private var query = ""
 
     var body: some View {
         DisclosureGroup {
-            ForEach(category.items) { ItemRow(model: model, item: $0) }
+            if !category.items.isEmpty {
+                HStack {
+                    Picker("Sort", selection: $sort) {
+                        ForEach(ItemSort.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    }
+                    .pickerStyle(.menu).fixedSize()
+                    if category.items.count > 10 {
+                        TextField("Search", text: $query).textFieldStyle(.roundedBorder)
+                    }
+                }
+                .controlSize(.small)
+            }
+            let shown = arrange(category.items, by: sort, matching: category.items.count > 10 ? query : "")
+            ForEach(shown) { ItemRow(model: model, item: $0) }
+            if shown.isEmpty, !category.items.isEmpty {
+                Text("No matches").font(.caption).foregroundStyle(.secondary)
+            }
         } label: {
             HStack(spacing: 6) {
                 category.id.color.frame(width: 10, height: 10).clipShape(RoundedRectangle(cornerRadius: 2))
@@ -191,6 +212,10 @@ private struct CategoryRow: View {
     }
 
     @ViewBuilder private var caption: some View {
+        if !category.items.isEmpty {
+            Text(category.items.count == 1 ? "1 item" : "\(category.items.count) items")
+                .font(.caption).foregroundStyle(.secondary)
+        }
         switch category.status {
         case .notUpdated: Text("not updated").font(.caption).foregroundStyle(.secondary)
         case .unavailable(let why): Text(why).font(.caption).foregroundStyle(.secondary)
@@ -225,6 +250,7 @@ private struct ItemRow: View {
             if case .trash(let url) = item.method {
                 Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
             }
+            Button("Hide from DevBroom") { model.hide(item) }
         }
     }
 

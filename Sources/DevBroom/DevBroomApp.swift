@@ -15,7 +15,7 @@ struct DevBroomApp: App {
         MenuBarExtra {
             PopoverView(model: model)
         } label: {
-            Image(systemName: "trash")
+            Image(nsImage: BroomIcon.image(warning: model.isLowOnSpace))
             Text(model.freeBytes.map(wholeGB) ?? "")
         }
         .menuBarExtraStyle(.window)

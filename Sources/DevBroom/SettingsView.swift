@@ -20,6 +20,29 @@ struct SettingsView: View {
                 Button("Add Folder…", action: addRoots)
             }
             Section {
+                if settings.hiddenItems.isEmpty {
+                    Text("Right-click an item in the panel and choose Hide from DevBroom to stop it being offered.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                ForEach(settings.hiddenItems.sorted { $0.value.localizedStandardCompare($1.value) == .orderedAscending },
+                        id: \.key) { id, name in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(name).lineLimit(1)
+                            Text(id).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                        }
+                        Spacer()
+                        Button("Unhide") { settings.hiddenItems[id] = nil }
+                    }
+                }
+            } header: {
+                Text("Hidden items")
+            } footer: {
+                if !settings.hiddenItems.isEmpty {
+                    Text("Unhidden items show again after the next scan.").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            Section {
                 Toggle("Launch at login", isOn: $settings.launchAtLogin).disabled(!isBundled)
                 if !isBundled {
                     Text("Available in the installed app").font(.caption).foregroundStyle(.secondary)

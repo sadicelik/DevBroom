@@ -90,6 +90,13 @@ Anything moved to the Trash can be put back until you empty the Trash. The few p
 4. **Confirm.** DevBroom works through the list, skips anything that fails, and tells you what it moved.
 5. **Get the space back.** Press **Delete from Trash now** to permanently delete only what DevBroom just moved (it asks once more). Anything else in your Trash is left alone. Or keep it in the Trash and decide later.
 
+Handy extras:
+
+- **Menu bar broom:** shows your free space and turns orange when it drops below your low-space limit.
+- **Item counts, sorting and search:** each row shows how many items it holds. Open a row to sort by size, last used or name, and to search rows with more than 10 items.
+- **Hide from DevBroom:** right-click an item you always want to keep. It is never offered again until you unhide it in Settings.
+- **Keyboard:** ⌘R rescans, ⌘⏎ opens the Clean summary (nothing is removed before you confirm), Esc closes.
+
 Closing the panel stops the scan straight away. Rows that didn't finish keep their old numbers and say "not updated".
 
 ## Safety rules
@@ -140,6 +147,7 @@ Open the panel and click **Settings**.
 | Recently used | 14 days | Items used more recently start unticked. |
 | Notify below | 15 GB free | Sends one alert when free space drops below this. |
 | Project scan roots | Your home folder | Where DevBroom looks for `node_modules`, build folders and model downloads. Hidden folders and `~/Library` are always skipped. |
+| Hidden items | None | Items you hid from the panel. Unhide brings them back at the next scan. |
 | Launch at login | Off | Starts DevBroom when you log in. |
 
 ## FAQ
